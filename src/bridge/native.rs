@@ -154,6 +154,24 @@ pub const FAMILIES: &[(&str, &[&str])] = &[
         &["SectionRecessArray", "SectionRecessGrid"],
     ),
     ("modelled_thread_refusals", &["ModelledThreadRefusal"]),
+    ("pad_refusals", &["PadRefusal"]),
+    ("prismatic_pocket_refusals", &["PrismaticPocketRefusal"]),
+    ("section_passage_refusals", &["SectionPassageRefusal"]),
+    ("oriented_slot_refusals", &["OrientedSlotRefusal"]),
+    ("reconciliation_refusals", &["ReconciliationRefusal"]),
+    ("polygonal_boss_refusals", &["PolygonalBossRefusal"]),
+];
+
+/// Quiddity's discovery refusal families (`recognition::DISCOVERY_REFUSAL_TYPES`): faces a
+/// recogniser looked at and declined. They carry no feature parameters this reader checks; each is
+/// kept as a refusal so its faces are reported unsupported rather than failing the whole read.
+pub const DISCOVERY_REFUSALS: [&str; 6] = [
+    "pad_refusals",
+    "prismatic_pocket_refusals",
+    "section_passage_refusals",
+    "oriented_slot_refusals",
+    "reconciliation_refusals",
+    "polygonal_boss_refusals",
 ];
 
 /// The families consumed here, including evidence and refusals. Oriented slot patterns are
@@ -861,6 +879,14 @@ pub fn read(part: &Part, doc: &RecognitionDocument) -> Result<Native, String> {
             }
             "interior_voids" if r.record_type == "InteriorVoidRefusal" => {
                 check(&r.parameters, &r.record_type)?;
+                refusals.push(super::Record {
+                    family: r.family.clone(),
+                    subtype: r.record_type.clone(),
+                    faces: r.faces.clone(),
+                    parameters: r.parameters.clone(),
+                });
+            }
+            f if DISCOVERY_REFUSALS.contains(&f) => {
                 refusals.push(super::Record {
                     family: r.family.clone(),
                     subtype: r.record_type.clone(),

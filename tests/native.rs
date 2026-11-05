@@ -1474,6 +1474,36 @@ fn plate_holes_and_grid_are_read_in_the_parts_frame() {
 }
 
 #[test]
+fn discovery_refusals_are_kept_as_refusals_not_errors() {
+    // Quiddity reports faces its pocket, pad, slot and boss recognisers declined in its
+    // discovery refusal families. A part with one (a handwheel's radial bushing holes, a
+    // nameplate's recessed label window) must still be read, with the refusal kept.
+    let (part, doc) = document("plate");
+    for family in native::DISCOVERY_REFUSALS {
+        let mut d = doc.clone();
+        let mut r = d.records[0].clone();
+        r.family = family.into();
+        r.record_type = match family {
+            "pad_refusals" => "PadRefusal",
+            "prismatic_pocket_refusals" => "PrismaticPocketRefusal",
+            "section_passage_refusals" => "SectionPassageRefusal",
+            "oriented_slot_refusals" => "OrientedSlotRefusal",
+            "reconciliation_refusals" => "ReconciliationRefusal",
+            _ => "PolygonalBossRefusal",
+        }
+        .into();
+        r.id = format!("{family}:1");
+        r.parameters.clear();
+        r.parameters.insert("reason".into(), serde_json::json!("declined"));
+        d.records.push(r);
+        let n = native::read(&part, &d).unwrap_or_else(|e| panic!("{family}: {e}"));
+        assert_eq!(n.refusals.len(), 1, "{family}");
+        assert_eq!(n.refusals[0].family, family);
+        assert_eq!(n.holes.len(), 4, "{family}: the holes are still read");
+    }
+}
+
+#[test]
 fn the_reader_refuses_what_it_does_not_know() {
     let (part, doc) = document("plate");
     let refused = |edit: &dyn Fn(&mut quiddity::recognition::RecognitionDocument)| {

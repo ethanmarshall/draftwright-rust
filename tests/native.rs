@@ -1881,6 +1881,9 @@ fn the_reader_knows_the_providers_schema() {
     let read: Vec<_> = native::FAMILIES
         .iter()
         .filter(|(f, _)| !derived.contains(f))
+        // Discovery refusals are in quiddity's document but not its declared record types; the
+        // reader keeps them as refusals (`native::DISCOVERY_REFUSALS`).
+        .filter(|(f, _)| !native::DISCOVERY_REFUSALS.contains(f))
         .copied()
         .collect();
     assert_eq!(read, quiddity::recognition::RECORD_TYPES);

@@ -147,14 +147,21 @@ fn invalid(message: String, choices: Vec<String>) -> Invalid {
 /// it is not one: `M<size>`, then optionally `x<pitch>` (spaces allowed around the `x`), `-<class>`
 /// and ` LH` or ` RH`.
 pub(crate) fn metric(designation: &str) -> Result<(f64, f64), String> {
-    // A Unified (inch) designation, ASME B1.1: `1/4-20 UNC-2B`, `#10-32 UNF`.
-    if let Some((major, pitch, _)) = crate::standard::parse_unified(designation) {
+    // A Unified (inch) designation, ASME B1.1 (`1/4-20 UNC-2B`, `#10-32 UNF`), on an ASME sheet.
+    let asme = crate::standard::asme();
+    if asme && let Some((major, pitch, _)) = crate::standard::parse_unified(designation) {
         return Ok((major, pitch));
     }
     let bad = || {
-        format!(
-            "{designation:?} is not a thread designation: M<size>[x<pitch>][-<class>][ LH] (M6, M10x1.25-6g) or Unified <size>-<tpi> UNC/UNF[-<class>] (1/4-20 UNC-2B)"
-        )
+        if asme {
+            format!(
+                "{designation:?} is not a thread designation: M<size>[x<pitch>][-<class>][ LH] (M6, M10x1.25-6g) or Unified <size>-<tpi> UNC/UNF[-<class>] (1/4-20 UNC-2B)"
+            )
+        } else {
+            format!(
+                "{designation:?} is not an ISO metric thread designation: M<size>[x<pitch>][-<class>][ LH] (M6, M10x1.25-6g); a Unified thread needs sheet/standard asme"
+            )
+        }
     };
     let s = designation.trim();
     let rest = s.strip_prefix('M').ok_or_else(bad)?;
@@ -244,6 +251,7 @@ fn note(at: &str, text: &str) -> Result<(), Invalid> {
 /// part (that is [`records`]' and [`crate::pmi_lowering::manufacturing`]'s). A refusal names the
 /// entry's path.
 pub(crate) fn check(spec: &Spec) -> Result<(), Invalid> {
+    let _standard = crate::standard::scope(spec);
     if let Some(f) = &spec.sheet.default_finish {
         finish("sheet/default_finish", f)?;
     }
@@ -332,6 +340,7 @@ pub(crate) fn records(
     spec: &Spec,
     part: usize,
 ) -> Result<Vec<Record>, Invalid> {
+    let _standard = crate::standard::scope(spec);
     use crate::spec_gdt::{attachments, feature_faces, named_faces, record};
     let patterns = analysis
         .recognition

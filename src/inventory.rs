@@ -617,7 +617,21 @@ pub fn match_pages(numbers: &[String], pages: &[String]) -> Vec<Option<Pages>> {
     numbers
         .iter()
         .map(|n| {
-            let own: Vec<usize> = (0..pages.len()).filter(|&i| owner[i] == Some(n)).collect();
+            let mut own: Vec<usize> = (0..pages.len()).filter(|&i| owner[i] == Some(n)).collect();
+            // An index or cover page ends on whichever number it lists last. When this number
+            // also owns other pages, drop the ones that name a drawing with its own sheet,
+            // unless they sit next to another of its pages (sheets of one drawing run together).
+            let all = own.clone();
+            let index = |i: &usize| {
+                let next_to_own = (*i > 0 && all.contains(&(i - 1))) || all.contains(&(i + 1));
+                !next_to_own
+                    && numbers
+                        .iter()
+                        .any(|m| m != n && names(&pages[*i], m) && owner.contains(&Some(m)))
+            };
+            if own.iter().any(|i| !index(i)) {
+                own.retain(|i| !index(i));
+            }
             if !own.is_empty() {
                 return Some(Pages {
                     pages: own,

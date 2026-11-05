@@ -250,7 +250,10 @@ pub(crate) fn label_value(label: &str) -> Option<f64> {
         return number(rest.trim_start()).map(|(v, _)| v);
     }
     let body = label.split(['±', '+']).next()?;
-    let start = body.find(|c: char| c.is_ascii_digit())?;
+    let mut start = body.find(|c: char| c.is_ascii_digit())?;
+    if body[..start].ends_with('.') {
+        start -= 1;
+    }
     number(&body[start..]).map(|(v, _)| v)
 }
 
@@ -283,17 +286,21 @@ fn label_vs_measured(
     }
     // A PMI label in inches states its unit (`pmi`'s `INCH`) and the record's own digits: its
     // value and its rounding are read in inches, then compared in millimetres.
-    let inch = label.split_whitespace().any(|t| t == "INCH");
+    // Under ASME every length label prints inches ([`crate::standard`]).
+    let inch = label.split_whitespace().any(|t| t == "INCH") || crate::standard::asme();
     let (unit, places) = if inch {
         let digits: String = label
             .trim()
             .chars()
             .take_while(|c| c.is_ascii_digit() || *c == '.')
             .collect();
-        (
-            25.4,
-            digits.split_once('.').map_or(0, |(_, f)| f.len()) as i32,
-        )
+        // An ASME label is written to three places ([`crate::standard::inch`]).
+        let places = if label.split_whitespace().any(|t| t == "INCH") {
+            digits.split_once('.').map_or(0, |(_, f)| f.len()) as i32
+        } else {
+            3
+        };
+        (25.4, places)
     } else {
         (
             1.0,
@@ -761,6 +768,8 @@ mod tests {
         assert_eq!(label_value("3× 20"), Some(20.0));
         assert_eq!(label_value("M10"), Some(10.0));
         assert_eq!(label_value("THRU"), None);
+        assert_eq!(label_value("⌀.250"), Some(0.25));
+        assert_eq!(label_value("4× ⌀.250 THRU"), Some(0.25));
         assert_eq!(displayed_decimals("40"), 1);
         assert_eq!(displayed_decimals("4.45"), 2);
         assert_eq!(displayed_decimals("12 ±0.05"), 1);

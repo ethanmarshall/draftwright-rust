@@ -673,7 +673,7 @@ fn layout(
         } else {
             std::iter::once(None)
                 .chain(
-                    crate::layout::SCALES
+                    crate::layout::scales()
                         .iter()
                         .copied()
                         .filter(|s| {
@@ -759,7 +759,7 @@ pub(super) fn prepare<'a>(
         ));
     }
     if settings.detail_scale.as_ref().is_some_and(|scale| {
-        !crate::layout::SCALES
+        !crate::layout::scales()
             .iter()
             .any(|s| model::scale_name(*s) == *scale)
     }) {

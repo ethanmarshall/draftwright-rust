@@ -38,9 +38,25 @@ use haecceity::presentation::tolerance::{GRADES, HOLE_CLASSES, MAX_NOMINAL_MM, S
 /// The requirement notation of fits and bands: ISO 286 classes and their limit deviations, and
 /// a band or a class's stacked deviations as text. haecceity's shared presentation module owns
 /// it, so the sheet and Specify's STEP callouts state a requirement the same way (#258).
-pub(super) use haecceity::presentation::tolerance::{
-    band, deviations, fit, limits_term, with_limits,
-};
+pub(super) use haecceity::presentation::tolerance::{band, deviations, fit};
+
+/// A class with its stacked deviations (haecceity's `with_limits`), in inches under ASME.
+pub(super) fn with_limits(code: &str, (lower, upper): (f64, f64)) -> String {
+    format!("{code} {}", limits_term((lower, upper)))
+}
+
+/// The stacked deviations alone, upper then lower with a newline (haecceity's `limits_term`);
+/// under ASME converted to inches, four decimals ([`crate::standard::inch_deviation`]).
+pub(super) fn limits_term((lower, upper): (f64, f64)) -> String {
+    if crate::standard::asme() {
+        return format!(
+            "{}\n{}",
+            crate::standard::inch_deviation(upper),
+            crate::standard::inch_deviation(lower)
+        );
+    }
+    haecceity::presentation::tolerance::limits_term((lower, upper))
+}
 
 /// A kept item, as [`super::plan`] holds it: the want, whether it is a default, its view and the
 /// views that look along it.

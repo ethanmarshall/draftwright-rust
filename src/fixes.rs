@@ -533,8 +533,9 @@ fn attach_inner(analysis: &crate::model::Analysis, plan: &mut crate::model::Plan
         let mut table = plan.clone();
         table.spec.hole_table = crate::hole_table::Setting::Always;
         let selection = crate::hole_table::select(analysis, &table);
-        crate::layout::SCALES
-            .into_iter()
+        crate::layout::scales()
+            .iter()
+            .copied()
             .find(|scale| {
                 *scale < plan.sheet.scale_factor
                     && *scale >= crate::sheet_fit::min_legible_scale(analysis)

@@ -239,7 +239,7 @@ impl Estimate {
     /// with the reserved paper mm it needs against what the paper offers; `None` if all hold.
     fn shortfall(&self, size: &str, max: usize, scale: f64) -> Option<String> {
         // Invariant: Candidates select paper names from the fixed PAGES table.
-        let (_, w, h) = layout::PAGES.iter().find(|p| p.0 == size).unwrap();
+        let (_, w, h) = layout::pages().iter().find(|p| p.0 == size).unwrap();
         let available = [w - 2.0 * layout::margin(), h - 2.0 * layout::margin()];
         let at = model::scale_name(scale);
         let frame = format!(
@@ -352,8 +352,9 @@ impl Estimate {
     /// Why no readable standard scale fits: the shortfall at the smallest readable scale,
     /// where every reserved outline is smallest, so every larger scale fails too.
     fn ruled_out(&self, size: &str, max: usize, floor: f64) -> String {
-        let smallest = layout::SCALES
-            .into_iter()
+        let smallest = layout::scales()
+            .iter()
+            .copied()
             .rev()
             .find(|s| *s + 1e-9 >= floor);
         match smallest.and_then(|s| Some((s, self.shortfall(size, max, s)?))) {
@@ -369,8 +370,9 @@ impl Estimate {
     }
 
     fn scale(&self, size: &str, max: usize, floor: f64) -> Option<f64> {
-        layout::SCALES
-            .into_iter()
+        layout::scales()
+            .iter()
+            .copied()
             .filter(|s| *s + 1e-9 >= floor)
             .find(|s| self.fits(size, max, *s))
     }
@@ -391,8 +393,9 @@ fn candidate_floor(analysis: &Analysis, baseline: &Plan, floor: f64) -> f64 {
     // fallback just to retain preferred paper.
     let floor = if baseline.sheet.scale_factor > sheet_fit::ABSOLUTE_FLOOR {
         floor.max(
-            layout::SCALES
-                .into_iter()
+            layout::scales()
+                .iter()
+                .copied()
                 .rev()
                 .find(|s| *s > sheet_fit::ABSOLUTE_FLOOR)
                 .unwrap_or(sheet_fit::ABSOLUTE_FLOOR),
@@ -407,8 +410,9 @@ fn candidate_floor(analysis: &Analysis, baseline: &Plan, floor: f64) -> f64 {
         return floor;
     }
     let needed = sheet_fit::min_step_scale(analysis, baseline);
-    let standard = layout::SCALES
-        .into_iter()
+    let standard = layout::scales()
+        .iter()
+        .copied()
         .rev()
         .find(|s| *s >= needed)
         .unwrap_or(needed);
@@ -438,18 +442,18 @@ fn preferred_sheets(spec: &Spec) -> usize {
 }
 
 fn requests(spec: &Spec) -> Vec<(&'static str, usize)> {
-    let preferred = layout::PAGES
+    let preferred = layout::pages()
         .iter()
         .position(|p| p.0 == cap(spec))
         .unwrap_or(1);
     let hard = spec.sheets.as_ref().and_then(|s| s.max).unwrap_or(9) as usize;
     let count = preferred_sheets(spec).min(hard);
-    let mut out: Vec<_> = layout::PAGES[..=preferred]
+    let mut out: Vec<_> = layout::pages()[..=preferred]
         .iter()
         .map(|p| (p.0, 1))
         .collect();
-    out.extend((2..=count).map(|n| (layout::PAGES[preferred].0, n)));
-    for p in &layout::PAGES[preferred + 1..] {
+    out.extend((2..=count).map(|n| (layout::pages()[preferred].0, n)));
+    for p in &layout::pages()[preferred + 1..] {
         out.extend((1..=count).map(|n| (p.0, n)));
     }
     out.extend((count + 1..=hard).map(|n| ("A0", n)));
@@ -646,8 +650,8 @@ fn finish_choice(mut plan: Plan, spec: &Spec, candidates: Vec<Candidate>, reason
     for s in &mut plan.sheets {
         s.default = true;
     }
-    let larger = layout::PAGES.iter().position(|p| p.0 == plan.sheet.size)
-        > layout::PAGES.iter().position(|p| p.0 == cap(spec));
+    let larger = layout::pages().iter().position(|p| p.0 == plan.sheet.size)
+        > layout::pages().iter().position(|p| p.0 == cap(spec));
     let more = 1 + plan.sheets.len() > preferred_sheets(spec);
     if larger || more {
         let which = match (larger, more) {
@@ -708,7 +712,7 @@ pub(crate) fn select(analysis: &Analysis, spec: &Spec) -> Result<Plan, Invalid> 
         let decision = crate::dims::idle_decision(analysis, spec);
         let paper = |p: &Plan| {
             (
-                layout::PAGES
+                layout::pages()
                     .iter()
                     .position(|g| g.0 == p.sheet.size)
                     .unwrap_or(usize::MAX),
@@ -771,7 +775,7 @@ fn select_once(analysis: &Analysis, spec: &Spec) -> Result<Plan, Invalid> {
     // automatic search: a part whose views fit A3 full size is not offered a large sheet.
     let small = std::cell::OnceCell::new();
     for (size, max) in requests(spec) {
-        let large = layout::PAGES
+        let large = layout::pages()
             .iter()
             .position(|p| p.0 == size)
             .is_some_and(|i| i >= model::LARGE_SHEET);
@@ -859,8 +863,9 @@ fn select_once(analysis: &Analysis, spec: &Spec) -> Result<Plan, Invalid> {
             .into_iter()
             .flat_map(|scale| {
                 std::iter::once(scale).chain(
-                    layout::SCALES
-                        .into_iter()
+                    layout::scales()
+                        .iter()
+                        .copied()
                         .find(|s| *s < scale && *s + 1e-9 >= floor),
                 )
             })
@@ -870,8 +875,9 @@ fn select_once(analysis: &Analysis, spec: &Spec) -> Result<Plan, Invalid> {
         } else if baseline_fits {
             // A refused baseline still earns one smaller readable scale on its own paper
             // before a larger sheet is tried.
-            steps = layout::SCALES
-                .into_iter()
+            steps = layout::scales()
+                .iter()
+                .copied()
                 .find(|s| *s < baseline.sheet.scale_factor && *s + 1e-9 >= floor)
                 .into_iter()
                 .collect();
@@ -1569,7 +1575,7 @@ mod tests {
         let Some(crowded) = corpus("mfcadpp_holdout/119.step") else {
             return;
         };
-        let paper = |p: &Plan| layout::PAGES.iter().position(|q| q.0 == p.sheet.size);
+        let paper = |p: &Plan| layout::pages().iter().position(|q| q.0 == p.sheet.size);
         let compact = |p: &Plan| p.sheet.dimension_spacing == model::DimensionSpacing::Compact;
         // Normal lanes need A3 for this part; compact lanes keep it on A4. (1013 was the witness
         // until its semicircular blind slot was drawn (#233); normal lanes now fit it on A4.)

@@ -290,7 +290,7 @@ mention takes its default.
 
 The design also includes `views/sections` (for example `"sections": [{"id": "A", "through": "f:hole:3"}]`). Feature `anchor` is read for recognition corrections, below; a feature's `note` is read since K1b (below).
 
-- **Fields read:** `sheet` (`size`, `scale`, `preferred_max_size`, `preferred_max_sheets`, `dimension_spacing`, `frame_gutter`, `table_columns`, `title`, `references`, `fit_deviations`, `fit_limits`, `projection`, `default_finish`, `hidden`, `centre_marks`, `centre_lines`, `thread_depiction`, `knurl_depiction`), `sheets` (below), `views/<name>` (`omit`, `place`, `sheet`, `hidden`, `centre_marks`, `centre_lines`, `thread_depiction`, `knurl_depiction`, `half_section`),
+- **Fields read:** `sheet` (`size`, `scale`, `preferred_max_size`, `preferred_max_sheets`, `dimension_spacing`, `frame_gutter`, `table_columns`, `title`, `references`, `fit_deviations`, `fit_limits`, `projection`, `standard`, `default_finish`, `hidden`, `centre_marks`, `centre_lines`, `thread_depiction`, `knurl_depiction`), `sheets` (below), `views/<name>` (`omit`, `place`, `sheet`, `hidden`, `centre_marks`, `centre_lines`, `thread_depiction`, `knurl_depiction`, `half_section`),
   `iso_scale_factor`, `dimension_source`, `dimension_schemes/<name>` (`scheme`, `axis`, `targets`, `view`, `from`), `hole_table` (`auto`, `always`, `never`), `dimensions/<id>` (`omit`, `tolerance`, `fit`, `text`, `style`, `place`, `kind`, `between`, `along`, and the earlier `view`
   spelling), `annotations/<id>` (`omit`, `place`, `text` for prose callouts and automatic notes), `features/<id>` (`fit`, `datum`, `controls`, `finish`, `thread`, `knurl`, `note`, `anchor`, `reclassify`, `suppress`, `split`, `pattern`, `gusset_view`), `feature_declarations`,
   `faces/<face>` (`datum`, `controls`, `finish`, `note`: "Datums and controls authored in the Spec" and "Finish, threads,
@@ -455,6 +455,26 @@ Reproduce three before/after PNG, SVG, Plan, Spec and lint pairs with
 grid, declare a real native pocket omission, and reinterpret a boss as a turned band.
 See [the validation and drafting review](recognition-corrections-validation.md) for
 results, retained warnings and the measured performance gates.
+
+#### Drawing standard: ISO or ASME
+
+`sheet/standard` is `iso` (absent means iso, and the plan is unchanged) or `asme`. Under `asme`
+the part is still read, planned and laid out in millimetres; only what is printed changes
+([`src/standard.rs`](../src/standard.rs)):
+
+- every length prints in inches ASME style, three places with no leading zero (`.250`,
+  `1.500`); an explicit `precision` sets the inch places; angles print as before;
+- the paper is ANSI A to E and the scales are the inch series (4:1, 2:1, 1:1, 1:2, 1:4, 1:8 …).
+  `sheet/size` and `preferred_max_size` take `A` … `E` (or `ANSI B`) as well as `A4` … `A0`,
+  which stand for the same five ranks;
+- the title block states `IN`, the ANSI size, and, when no general tolerance is given,
+  `.XX ±.01 .XXX ±.005 ±0.5° ASME Y14.5-2018`;
+- a modelled thread that matches a Unified thread is named as one (`1/4-20 UNC`), and a note's
+  thread may be given as a Unified designation (`#10-32 UNF-2B`);
+- tolerance limits print as inch deviations (`+.0005`); ISO 286 fit classes are still named
+  when a fit is asked for (ANSI B4.1 fits are not implemented).
+
+Lint reads labels in the same unit, so an ASME drawing's review reports what an ISO one would.
 
 #### Projection method and a pinned sheet's fit
 

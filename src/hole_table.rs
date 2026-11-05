@@ -2130,6 +2130,15 @@ fn schedule_number(value: f64) -> String {
     text.strip_suffix(".0").unwrap_or(&text).into()
 }
 
+/// A dimension's printed term restated in a schedule cell: a bare millimetre number in the
+/// schedule's form. An ASME term is already printed in inches and is kept as it is.
+fn reprint(t: &String) -> String {
+    if crate::standard::asme() {
+        return t.clone();
+    }
+    t.parse::<f64>().map_or_else(|_| t.clone(), schedule_number)
+}
+
 fn has_precision(plan: &Plan, d: &PlannedDimension) -> bool {
     !plan.spec.precision.is_empty()
         && (plan.spec.precision.contains_key(&d.id)
@@ -2507,13 +2516,7 @@ fn select_with(analysis: &Analysis, plan: &Plan, replace_pmi: bool) -> Selection
                     !(t.starts_with('(') && t.contains('×') && t.ends_with(')'))
                         && !t.starts_with("EQ SP")
                 })
-                .map(|t| {
-                    if approved_size {
-                        t.clone()
-                    } else {
-                        t.parse::<f64>().map_or_else(|_| t.clone(), schedule_number)
-                    }
-                })
+                .map(|t| if approved_size { t.clone() } else { reprint(t) })
                 .collect::<Vec<_>>()
                 .join(" ");
             // A pin keeps its complete callout. The row is additive for that item. A size from
@@ -2599,8 +2602,7 @@ fn select_with(analysis: &Analysis, plan: &Plan, replace_pmi: bool) -> Selection
                                             if has_precision(plan, d) {
                                                 t.clone()
                                             } else {
-                                                t.parse::<f64>()
-                                                    .map_or_else(|_| t.clone(), schedule_number)
+                                                reprint(t)
                                             }
                                         })
                                         .collect::<Vec<_>>()
@@ -2702,7 +2704,7 @@ fn select_with(analysis: &Analysis, plan: &Plan, replace_pmi: bool) -> Selection
                         .rem_euclid(360.0);
                     format!(
                         "{}°",
-                        schedule_number(if angle > 360.0 - 1e-6 { 0.0 } else { angle })
+                        crate::dims::fmt_angle(if angle > 360.0 - 1e-6 { 0.0 } else { angle })
                     )
                 } else {
                     String::new()

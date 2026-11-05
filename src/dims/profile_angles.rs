@@ -182,7 +182,7 @@ fn angle_want(id: String, corners: &[&Corner], reference: bool, basis: &str) -> 
     let c = corners[0];
     // atan2 differs in its last bits between native and WASM libm; the plan's value must not.
     let value = (c.degrees() * 1e9).round() / 1e9;
-    let mut text = format!("{}°", fmt(value));
+    let mut text = format!("{}°", crate::dims::fmt_angle(value));
     if corners.len() > 1 {
         text = format!("{}× {text}", corners.len());
     }

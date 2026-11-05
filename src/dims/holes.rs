@@ -120,7 +120,7 @@ impl Hole<'_> {
         if let Some(c) = self.countersink {
             t.extend(["⌵".into(), format!("⌀{}", fmt(c.diameter))]);
             if let Some(a) = c.angle {
-                t.extend(["×".into(), format!("{}°", fmt(a))]);
+                t.extend(["×".into(), format!("{}°", crate::dims::fmt_angle(a))]);
             }
         }
         t

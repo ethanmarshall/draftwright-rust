@@ -226,7 +226,7 @@ pub(super) fn channel(cx: &Context, f: &Feature) -> Result<Vec<Want>, String> {
         views: vec![view],
         value: angle,
         terms: vec![
-            format!("{}°", fmt(angle)),
+            format!("{}°", crate::dims::fmt_angle(angle)),
             "V".into(),
             "×".into(),
             fmt(depth),
@@ -321,7 +321,7 @@ fn wants(cx: &Context) -> (Vec<Want>, Vec<Problem>) {
         let value = n.angle.degrees();
         out.push(Want {
             id: id(&n.id,"notch.angle"), views:vec![view], value,
-            terms:vec![format!("{}°",fmt(value))],
+            terms:vec![format!("{}°",crate::dims::fmt_angle(value))],
             measurements:vec![Measurement {feature:n.id.clone(),parameter:"notch.angle".into(),value}],
             basis:"a V-notch's included angle, in the normal view that shows it true; rounded roots extend to the theoretical sharp apex".into(),
             shape:Shape::Angular {angle:(&n.angle).into(), alternates: Vec::new()}, turning:None,

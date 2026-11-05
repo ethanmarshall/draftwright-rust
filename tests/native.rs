@@ -1494,7 +1494,8 @@ fn discovery_refusals_are_kept_as_refusals_not_errors() {
         .into();
         r.id = format!("{family}:1");
         r.parameters.clear();
-        r.parameters.insert("reason".into(), serde_json::json!("declined"));
+        r.parameters
+            .insert("reason".into(), serde_json::json!("declined"));
         d.records.push(r);
         let n = native::read(&part, &d).unwrap_or_else(|e| panic!("{family}: {e}"));
         assert_eq!(n.refusals.len(), 1, "{family}");

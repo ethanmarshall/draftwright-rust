@@ -14,8 +14,9 @@ pub const ABSOLUTE_FLOOR: f64 = 0.1;
 
 pub fn min_legible_scale(analysis: &Analysis) -> f64 {
     let needed = min_geometry_scale(analysis).max(crate::dims::recess_chain_scale(analysis));
-    crate::layout::SCALES
-        .into_iter()
+    crate::layout::scales()
+        .iter()
+        .copied()
         .rev()
         .find(|s| *s >= needed)
         .unwrap_or(needed)
@@ -45,8 +46,9 @@ pub(crate) fn min_geometry_scale(analysis: &Analysis) -> f64 {
     let needed = (MIN_OPENING / opening)
         .max(20.0 / longest.max(1e-12))
         .max(ABSOLUTE_FLOOR);
-    crate::layout::SCALES
-        .into_iter()
+    crate::layout::scales()
+        .iter()
+        .copied()
         .rev()
         .find(|s| *s >= needed)
         .unwrap_or(needed)
@@ -1342,7 +1344,7 @@ pub(crate) fn rank(a: (f64, f64, f64), b: (f64, f64, f64)) -> std::cmp::Ordering
 /// A finished valid, complete pair as the sheet choice sees it.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct Candidate {
-    /// Index into [`crate::layout::PAGES`].
+    /// Index into [`crate::layout::pages()`].
     pub sheet: usize,
     pub scale: f64,
     /// Page width, mm: the paper preference.
@@ -2184,7 +2186,7 @@ mod tests {
         Candidate {
             sheet,
             scale,
-            width: crate::layout::PAGES[sheet].1,
+            width: crate::layout::pages()[sheet].1,
             fill,
             extra_crossings,
         }

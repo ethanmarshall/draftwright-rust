@@ -627,12 +627,12 @@ pub(crate) fn size_with_details(
             None,
         );
         if scale.is_none() && page.is_none() && bare.scale < d.lanes.recess_chain_scale {
-            let readable = layout::SCALES
+            let readable = layout::scales()
                 .iter()
                 .copied()
                 .rev()
                 .find(|s| *s >= d.lanes.recess_chain_scale)
-                .unwrap_or(layout::SCALES[0]);
+                .unwrap_or(layout::scales()[0]);
             bare = layout::choose(
                 &req,
                 &|_| Scaled::default(),
@@ -683,7 +683,7 @@ pub(crate) fn size_with_details(
         .collect();
     if !gdt.is_empty() {
         let base = strips.clone();
-        for _ in 0..=layout::SCALES.len() * layout::PAGES.len() {
+        for _ in 0..=layout::scales().len() * layout::pages().len() {
             let mut wider = strips.clone();
             wider.reserve_gdt(&base, &d.lanes, d.gdt_beyond_lanes, &gdt, pick.scale);
             if wider == strips {

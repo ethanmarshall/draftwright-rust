@@ -147,9 +147,13 @@ fn invalid(message: String, choices: Vec<String>) -> Invalid {
 /// it is not one: `M<size>`, then optionally `x<pitch>` (spaces allowed around the `x`), `-<class>`
 /// and ` LH` or ` RH`.
 pub(crate) fn metric(designation: &str) -> Result<(f64, f64), String> {
+    // A Unified (inch) designation, ASME B1.1: `1/4-20 UNC-2B`, `#10-32 UNF`.
+    if let Some((major, pitch, _)) = crate::standard::parse_unified(designation) {
+        return Ok((major, pitch));
+    }
     let bad = || {
         format!(
-            "{designation:?} is not an ISO metric thread designation: M<size>[x<pitch>][-<class>][ LH] (M6, M10x1.25-6g)"
+            "{designation:?} is not a thread designation: M<size>[x<pitch>][-<class>][ LH] (M6, M10x1.25-6g) or Unified <size>-<tpi> UNC/UNF[-<class>] (1/4-20 UNC-2B)"
         )
     };
     let s = designation.trim();

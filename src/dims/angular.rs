@@ -518,7 +518,7 @@ pub(crate) fn notch_reservations(
             _ => ("plan", [0., 0., 1.], [0., 1., 0.]),
         };
         let frame = Frame::looking(a, direction, up, [0.; 2], scale);
-        let terms = vec![format!("{}°", super::fmt(n.angle.degrees()))];
+        let terms = vec![format!("{}°", super::fmt_angle(n.angle.degrees()))];
         let ink = label_ink(&terms, font());
         let size = [ink.max[0] - ink.min[0], ink.max[1] - ink.min[1]];
         // Invariant: The notch reader proves nonzero rays and angle in this principal plane.

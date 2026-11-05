@@ -46,7 +46,7 @@ pub struct CrossRef {
 }
 
 pub fn zones(page: [f64; 2]) -> Zones {
-    let (columns, rows) = layout::PAGES
+    let (columns, rows) = layout::pages()
         .iter()
         .position(|(_, w, h)| [*w, *h] == page)
         .map(|i| [(6, 4), (8, 6), (12, 8), (16, 12), (24, 16)][i])
@@ -101,8 +101,9 @@ pub(crate) fn floor(spec: &Spec) -> Option<f64> {
         .smallest_scale
         .as_ref()
         .and_then(|name| {
-            layout::SCALES
-                .into_iter()
+            layout::scales()
+                .iter()
+                .copied()
                 .find(|s| model::scale_name(*s) == *name)
         })
 }
@@ -250,7 +251,7 @@ pub(crate) fn validate(spec: &Spec) -> Result<(), Invalid> {
             let Some(f) = floor(spec) else {
                 return Err(refuse(
                     format!("{name:?} is not a standard smallest scale."),
-                    layout::SCALES.map(model::scale_name).to_vec(),
+                    layout::scales().map(model::scale_name).to_vec(),
                 ));
             };
             if spec
@@ -258,8 +259,9 @@ pub(crate) fn validate(spec: &Spec) -> Result<(), Invalid> {
                 .scale
                 .as_ref()
                 .and_then(|name| {
-                    layout::SCALES
-                        .into_iter()
+                    layout::scales()
+                        .iter()
+                        .copied()
                         .find(|v| model::scale_name(*v) == *name)
                 })
                 .is_some_and(|scale| scale < f)
@@ -717,7 +719,7 @@ pub(crate) fn small_fallback(
         tried.push("small-sheet allocation blocked by explicit sheets.max = 1".into());
         return None;
     }
-    for (name, _, _) in layout::PAGES.iter().take(2) {
+    for (name, _, _) in layout::pages().iter().take(2) {
         let mut working = spec.clone();
         working.sheet.size = Some((*name).into());
         working.sheets.get_or_insert_with(Default::default).max =
@@ -1180,8 +1182,9 @@ fn pack_with_overflow(
                         }),
                 );
                 let scales: Vec<_> = if shrink {
-                    layout::SCALES
-                        .into_iter()
+                    layout::scales()
+                        .iter()
+                        .copied()
                         .filter(|s| *s < plan.sheet.scale_factor)
                         .collect()
                 } else {
@@ -1274,9 +1277,9 @@ fn pack_with_overflow(
                     name,
                     if *name == "iso" {
                         spec.iso_scale_factor
-                            .map_or(layout::SCALES[15], |f| f * plan.sheet.scale_factor)
+                            .map_or(layout::scales()[15], |f| f * plan.sheet.scale_factor)
                     } else {
-                        layout::SCALES[15]
+                        layout::scales()[15]
                     },
                     n,
                     plan.sheet.scale_factor,
@@ -1462,7 +1465,7 @@ pub(crate) fn replay_views(analysis: &Analysis, source: &Plan, frame: &Plan) -> 
 /// Repack only when existing ruled furniture is taller than the requested page. The
 /// settled dimensions, datum symbols, tags and required rows all survive as owned ink.
 pub(crate) fn reflow_tall_tables(analysis: &Analysis, source: &Plan, size: &str) -> Option<Plan> {
-    let (_, _, height) = layout::PAGES.iter().find(|p| p.0 == size)?;
+    let (_, _, height) = layout::pages().iter().find(|p| p.0 == size)?;
     let drawable = height - 2.0 * layout::margin();
     let tall = source
         .hole_tables
@@ -1704,7 +1707,7 @@ fn separate_views_inner(
         adjusted.captions.retain(|c| c.view != "v:iso");
     }
     let source = &adjusted;
-    let (_, w, h) = layout::PAGES.iter().find(|p| p.0 == size)?;
+    let (_, w, h) = layout::pages().iter().find(|p| p.0 == size)?;
     let mut plan = source.clone();
     let page_delta = [w - source.sheet.page[0], h - source.sheet.page[1]];
     plan.sheet.size = size.into();
@@ -2611,7 +2614,7 @@ fn check_with_search(plan: &Plan, blocked: bool) -> Vec<Problem> {
                 } else {
                     format!("sheet:{}", sheet.number)
                 };
-                let index = layout::PAGES
+                let index = layout::pages()
                     .iter()
                     .position(|(n, ..)| *n == sheet.size)
                     .unwrap_or(4);
@@ -2622,15 +2625,16 @@ fn check_with_search(plan: &Plan, blocked: bool) -> Vec<Problem> {
                 let fix = if sheet.number == 1 && blocked && maximum(&plan.spec) < 9 {
                     Op::set("sheets/max", json!(maximum(&plan.spec) + 1))
                 } else if plan.spec.sheet.size.is_some() && index < 4 {
-                    Op::set("sheet/size", json!(layout::PAGES[index + 1].0))
+                    Op::set("sheet/size", json!(layout::pages()[index + 1].0))
                 } else {
                     Op::set(
                         "sheets/smallest_scale",
                         json!(model::scale_name(
-                            layout::SCALES
-                                .into_iter()
+                            layout::scales()
+                                .iter()
+                                .copied()
                                 .find(|s| *s <= scale)
-                                .unwrap_or(layout::SCALES[15])
+                                .unwrap_or(layout::scales()[15])
                         )),
                     )
                 };

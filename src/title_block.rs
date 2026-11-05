@@ -280,6 +280,10 @@ pub fn value_size(value: &str, cell: [f64; 4]) -> f64 {
     (TEXT * room).clamp(MIN_TEXT, TEXT)
 }
 
+/// The general tolerance an ASME sheet states when the Spec gives none: the usual block
+/// tolerance and the standard it is interpreted to ([`crate::standard`]).
+const ASME_TOLERANCE: &str = ".XX ±.01 .XXX ±.005 ±0.5° ASME Y14.5-2018";
+
 /// The cells in *block* (the layout's reservation, `[x0, y0, x1, y1]`), with the values from
 /// *title* (the plan's `sheet.title`, by spec key) and the sheet's *size*. A value that is empty
 /// or only whitespace is no value, and is drawn without its surrounding whitespace.
@@ -291,9 +295,19 @@ pub fn cells(block: [f64; 4], title: &BTreeMap<String, String>, size: &str) -> V
             let author = title.get("drawn_by").map_or("", String::as_str);
             return Some(attribution(author));
         }
+        let asme = crate::standard::asme();
+        let format = crate::standard::sheet_name(size);
         let v = match field {
+            "units" if asme => "IN",
             "units" => "mm",
-            "format" => size,
+            "format" => format.as_str(),
+            "general_tolerance" if asme => {
+                let key = KEYS.iter().find(|(_, f)| *f == field)?.0;
+                match title.get(key).map(|t| t.trim()).filter(|t| !t.is_empty()) {
+                    Some(t) => t,
+                    None => ASME_TOLERANCE,
+                }
+            }
             _ => {
                 let key = KEYS.iter().find(|(_, f)| *f == field)?.0;
                 title.get(key)?.as_str()

@@ -192,6 +192,9 @@ impl HoleGroup {
 
 /// A number as messages print it: at most three decimals, trailing zeros dropped.
 fn fmt(x: f64) -> String {
+    if crate::standard::asme() {
+        return crate::standard::inch(x);
+    }
     let s = format!("{x:.3}");
     let s = s.trim_end_matches('0').trim_end_matches('.');
     if s == "-0" { "0".into() } else { s.into() }
@@ -284,13 +287,20 @@ pub fn groups(analysis: &Analysis) -> Vec<HoleGroup> {
     out
 }
 
+/// Whether a number starts at *i* with its decimal point, ASME style (`.250`).
+fn leading_point(chars: &[char], i: usize) -> bool {
+    chars[i] == '.'
+        && chars.get(i + 1).is_some_and(|c| c.is_ascii_digit())
+        && (i == 0 || !chars[i - 1].is_ascii_digit())
+}
+
 /// The numbers a text prints, each with its count of decimals.
 fn numbers(text: &str) -> Vec<(f64, usize)> {
     let chars: Vec<char> = text.chars().collect();
     let mut out = Vec::new();
     let mut i = 0;
     while i < chars.len() {
-        if chars[i].is_ascii_digit() {
+        if chars[i].is_ascii_digit() || leading_point(&chars, i) {
             let start = i;
             while i < chars.len() && chars[i].is_ascii_digit() {
                 i += 1;
@@ -304,7 +314,7 @@ fn numbers(text: &str) -> Vec<(f64, usize)> {
                 }
             }
             let s: String = chars[start..i].iter().collect();
-            if let Ok(v) = s.parse() {
+            if let Ok(v) = format!("0{s}").parse() {
                 out.push((v, decimals));
             }
         } else {
@@ -318,9 +328,24 @@ fn numbers(text: &str) -> Vec<(f64, usize)> {
 /// The families sharing [`super::parameters`] read their labels this way; hole coverage reads a
 /// callout term by term ([`Callout`]).
 pub fn states(text: &str, value: f64) -> bool {
+    states_printed(text, printed(value))
+}
+
+/// Whether *text* states an angle of *degrees* (never converted to inches).
+pub fn states_angle(text: &str, degrees: f64) -> bool {
+    states_printed(text, degrees)
+}
+
+/// Whether *text* states *value*, already in the units the sheet prints.
+pub fn states_printed(text: &str, value: f64) -> bool {
     numbers(text)
         .iter()
         .any(|&(n, decimals)| rounds(n, decimals, value))
+}
+
+/// A length in mm as the sheet prints it: inches under ASME ([`crate::standard`]).
+pub fn printed(mm: f64) -> f64 {
+    crate::standard::printed(mm)
 }
 
 /// Whether the number *n*, printed with *decimals* decimals, rounds from *value*.
@@ -398,7 +423,7 @@ impl Callout {
         let mut i = 0;
         while i < chars.len() {
             let c = chars[i];
-            if c.is_ascii_digit() {
+            if c.is_ascii_digit() || leading_point(&chars, i) {
                 let start = i;
                 while i < chars.len() && chars[i].is_ascii_digit() {
                     i += 1;
@@ -411,9 +436,7 @@ impl Callout {
                         decimals += 1;
                     }
                 }
-                let v: f64 = chars[start..i]
-                    .iter()
-                    .collect::<String>()
+                let v: f64 = format!("0{}", chars[start..i].iter().collect::<String>())
                     .parse()
                     .unwrap_or(f64::NAN);
                 let signed = start > 0 && matches!(chars[start - 1], '±' | '+' | '-');
@@ -561,6 +584,11 @@ impl Callout {
                 .collect();
             (numbers.len() == 1).then(|| numbers[0])
         };
+        let value = if parameter.contains("angle") {
+            value
+        } else {
+            printed(value)
+        };
         term.is_some_and(|(n, decimals)| rounds(n, decimals, value))
     }
 }
@@ -572,7 +600,7 @@ pub fn states_bore(text: &str, diameter: f64) -> bool {
     // the explicit diameter term; the scalar fallback is for independent depth dimensions.
     Callout::read(text)
         .term("bore.diameter", false, 0)
-        .is_some_and(|(number, decimals)| rounds(number, decimals, diameter))
+        .is_some_and(|(number, decimals)| rounds(number, decimals, printed(diameter)))
 }
 
 /// A scheduled size cell is one physical hole's complete callout. Its physical riders

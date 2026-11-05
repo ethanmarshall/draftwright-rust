@@ -390,7 +390,11 @@ fn seat_wants(cx: &Context, out: &mut Vec<Want>, problems: &mut Vec<Problem>) {
         }
         let diameter = 2.0 * first.radius;
         terms.extend([format!("ø{}", fmt(diameter)), "×".into(), fmt(first.length)]);
-        terms.extend(["LONG".into(), "×".into(), format!("{}°", fmt(first.sweep))]);
+        terms.extend([
+            "LONG".into(),
+            "×".into(),
+            format!("{}°", crate::dims::fmt_angle(first.sweep)),
+        ]);
         terms.push("ARC".into());
         out.push(Want {
             id: want_id(&first.feature.id, "seat_diameter.diameter"),

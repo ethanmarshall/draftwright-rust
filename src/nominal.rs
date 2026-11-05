@@ -38,7 +38,18 @@ pub(crate) fn clean(value: f64) -> f64 {
     (value * 1e6).round() / 1e6
 }
 
+/// A length as labels print it: under ASME ([`crate::standard`]) in inches, three decimals and
+/// no leading zero; otherwise the shortest millimetre nominal ([`format_angle`]'s rule).
 pub(crate) fn format(value: f64) -> String {
+    if crate::standard::asme() && !comparison() {
+        return crate::standard::inch(value);
+    }
+    format_angle(value)
+}
+
+/// A unitless number (an angle in degrees, a count, a ratio) as labels print it: shortest within
+/// 1e-6, at most three decimals, whatever the standard.
+pub(crate) fn format_angle(value: f64) -> String {
     let value = clean(value);
     if comparison() {
         let rounded = value.round();
@@ -112,14 +123,14 @@ pub(crate) fn report(plan: &mut crate::model::Plan) {
                             && token.parse::<f64>().ok() == printed.parse::<f64>().ok())
                 });
             if printed_here
-                && printed
-                    .parse::<f64>()
-                    .is_ok_and(|v| (v - clean(m.value)).abs() > 1e-6 + 1e-12)
+                && printed.parse::<f64>().is_ok_and(|v| {
+                    (v - clean(crate::standard::printed(m.value))).abs() > 1e-6 + 1e-12
+                })
             {
                 problems.insert((id.to_string(), measurement.clone()), crate::model::Problem {
                     id: format!("p:nominal_rounded:{id}:{measurement}"),
                     code: "nominal_rounded".into(), severity: "info".into(),
-                    message: format!("The dimension {text:?} has modelled nominal {} but prints {printed} at the default three-place limit.", clean(m.value)),
+                    message: format!("The dimension {text:?} has modelled nominal {} but prints {printed} at the default three-place limit.", clean(crate::standard::printed(m.value))),
                     subjects: vec![id.into()], ..Default::default()
                 });
             }

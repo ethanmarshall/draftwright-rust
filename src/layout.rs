@@ -81,6 +81,70 @@ const TOL: f64 = 0.5;
 /// has on its left (draftwright's row budget for a section, `10 + 2 hw + DIM_PAD`).
 const SECTION_GAP: f64 = 10.0;
 
+/// The sheets of the current standard ([`crate::standard`]), smallest first: ISO 216 A4 … A0,
+/// or under ASME the ANSI A … E sheets, which keep the names `A4` … `A0` as ranks.
+pub fn pages() -> &'static [(&'static str, f64, f64); 5] {
+    if crate::standard::asme() {
+        &crate::standard::ANSI_PAGES
+    } else {
+        &PAGES
+    }
+}
+
+/// The scales of the current standard, largest first ([`SCALES`], or [`INCH_SCALES`] under ASME).
+pub fn scales() -> &'static [f64; 16] {
+    if crate::standard::asme() {
+        &INCH_SCALES
+    } else {
+        &SCALES
+    }
+}
+
+/// The automatic scale and sheet ladder of the current standard ([`LADDER`] or [`INCH_LADDER`]).
+fn ladder() -> &'static [(f64, &'static str); 26] {
+    if crate::standard::asme() {
+        &INCH_LADDER
+    } else {
+        &LADDER
+    }
+}
+
+/// Inch drawing scales (ANSI Y14.1 practice), largest first.
+pub const INCH_SCALES: [f64; 16] = [
+    10.0, 4.0, 2.0, 1.0, 0.5, 0.25, 0.125, 0.1, 0.05, 0.02, 0.01, 0.005, 0.002, 0.001, 0.0005,
+    0.0002,
+];
+
+/// [`LADDER`] in inch scales on ANSI sheets.
+const INCH_LADDER: [(f64, &str); 26] = [
+    (10.0, "A4"),
+    (4.0, "A4"),
+    (2.0, "A4"),
+    (1.0, "A4"),
+    (4.0, "A3"),
+    (2.0, "A3"),
+    (1.0, "A3"),
+    (2.0, "A2"),
+    (1.0, "A2"),
+    (1.0, "A1"),
+    (0.5, "A2"),
+    (0.25, "A3"),
+    (0.25, "A2"),
+    (0.5, "A1"),
+    (0.25, "A1"),
+    (0.5, "A0"),
+    (0.25, "A0"),
+    (0.125, "A0"),
+    (0.05, "A0"),
+    (0.02, "A0"),
+    (0.01, "A0"),
+    (0.005, "A0"),
+    (0.002, "A0"),
+    (0.001, "A0"),
+    (0.0005, "A0"),
+    (0.0002, "A0"),
+];
+
 /// ISO 216 sheets, smallest first: name, width, height (mm, landscape).
 pub const PAGES: [(&str, f64, f64); 5] = [
     ("A4", 297.0, 210.0),
@@ -133,8 +197,11 @@ pub fn title_block_width(page_w: f64) -> f64 {
 }
 
 fn sheet(name: &str) -> [f64; 2] {
-    // Invariant: LADDER names only entries in the fixed PAGES array.
-    let (_, w, h) = PAGES.iter().find(|p| p.0 == name).expect("a ladder sheet");
+    // Invariant: ladder() names only entries in the fixed pages() array.
+    let (_, w, h) = pages()
+        .iter()
+        .find(|p| p.0 == name)
+        .expect("a ladder sheet");
     [*w, *h]
 }
 
@@ -1555,24 +1622,31 @@ pub fn choose(
         return pick(s, p, preferred, fallback);
     }
     let (mut candidates, packed): (Vec<(f64, [f64; 2])>, bool) = match (scale, page) {
-        (None, Some(p)) => (SCALES.iter().map(|s| (*s, p)).collect(), true),
-        (Some(s), None) => (PAGES.iter().map(|(_, w, h)| (s, [*w, *h])).collect(), true),
-        _ => (LADDER.iter().map(|(s, n)| (*s, sheet(n))).collect(), false),
+        (None, Some(p)) => (scales().iter().map(|s| (*s, p)).collect(), true),
+        (Some(s), None) => (
+            pages().iter().map(|(_, w, h)| (s, [*w, *h])).collect(),
+            true,
+        ),
+        _ => (
+            ladder().iter().map(|(s, n)| (*s, sheet(n))).collect(),
+            false,
+        ),
     };
     if page.is_none()
         && let Some(max) = req.max_page
     {
-        candidates.retain(|(_, p)| p[0] <= PAGES[max].1 && p[1] <= PAGES[max].2);
-        if scale.is_none() && max < PAGES.len() - 1 {
+        candidates.retain(|(_, p)| p[0] <= pages()[max].1 && p[1] <= pages()[max].2);
+        if scale.is_none() && max < pages().len() - 1 {
             // The old ladder's reduction tail belongs to A0. With a smaller
             // maximum it belongs to that paper instead; removing it would jump
             // straight from 1:5 (A3) or 1:1 (A4) to a microscopic computed scale.
             let last_scale = candidates.last().expect("bounded ladder is nonempty").0;
             candidates.extend(
-                SCALES
-                    .into_iter()
+                scales()
+                    .iter()
+                    .copied()
                     .filter(|s| *s < last_scale && *s >= 0.0002)
-                    .map(|s| (s, [PAGES[max].1, PAGES[max].2])),
+                    .map(|s| (s, [pages()[max].1, pages()[max].2])),
             );
         }
     }
@@ -1595,7 +1669,7 @@ pub fn choose(
         }
         return pick(s, p, preferred, None);
     }
-    // Invariant: Each candidate branch iterates nonempty SCALES, PAGES or LADDER constants.
+    // Invariant: Each candidate branch iterates nonempty scales(), pages() or ladder() constants.
     let (_, last) = *candidates.last().expect("candidates");
     if scale.is_none() {
         // Past the ladder: the largest scale that fits the largest sheet. draftwright bisects
@@ -1604,7 +1678,7 @@ pub fn choose(
             views: Principals::ALL,
             ..req.clone()
         };
-        let (mut lo, mut hi) = (0.0, SCALES[SCALES.len() - 1]);
+        let (mut lo, mut hi) = (0.0, scales()[scales().len() - 1]);
         for _ in 0..60 {
             let mid = (lo + hi) / 2.0;
             let g = geometry(
@@ -1626,7 +1700,7 @@ pub fn choose(
             return pick(lo, last, Arrangement::Columns, Some(Fallback::Computed));
         }
     }
-    // Invariant: Each candidate branch iterates nonempty SCALES, PAGES or LADDER constants.
+    // Invariant: Each candidate branch iterates nonempty scales(), pages() or ladder() constants.
     let (s, p) = *candidates.last().expect("candidates");
     pick(s, p, Arrangement::Columns, Some(Fallback::Overflow))
 }
@@ -1688,11 +1762,11 @@ pub fn recover(
     floor: Option<f64>,
     plan: &mut dyn FnMut(Retry) -> Option<Findings>,
 ) -> Vec<Attempt> {
-    let smaller = SCALES
+    let smaller = scales()
         .iter()
         .copied()
         .filter(|s| *s < scale && floor.is_none_or(|f| *s >= f));
-    let mut larger: Vec<f64> = SCALES
+    let mut larger: Vec<f64> = scales()
         .iter()
         .copied()
         .filter(|s| *s > scale && floor.is_none_or(|f| *s >= f))
@@ -1708,11 +1782,11 @@ pub fn recover(
     } else {
         return Vec::new();
     };
-    let sheets = PAGES
+    let sheets = pages()
         .iter()
         .position(|(_, w, h)| [*w, *h] == page)
         .filter(|_| !page_pinned)
-        .map_or(&[][..], |i| &PAGES[i + 1..]);
+        .map_or(&[][..], |i| &pages()[i + 1..]);
     let retries = scales
         .into_iter()
         .map(Retry::Scale)

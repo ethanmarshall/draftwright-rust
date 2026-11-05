@@ -187,7 +187,7 @@ pub(super) fn append(a: &Analysis, s: &Spec, wants: &mut Vec<Want>) -> Result<()
         let label = match kind {
             "diameter" => format!("⌀{}", fmt(m.value)),
             "radius" => format!("R{}", fmt(m.value)),
-            "angle" => format!("{}°", fmt(m.value)),
+            "angle" => format!("{}°", crate::dims::fmt_angle(m.value)),
             _ => fmt(m.value),
         };
         let mut w = Want {

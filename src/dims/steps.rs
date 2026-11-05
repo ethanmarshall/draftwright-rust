@@ -170,7 +170,7 @@ fn ramp(f: &Feature, frame: &QFrame) -> Result<Want, String> {
     let view = end_on(k);
     let terms = vec![
         "2×".into(),
-        format!("{}°", fmt(angle)),
+        format!("{}°", crate::dims::fmt_angle(angle)),
         "×".into(),
         fmt(length),
         "RUN".into(),

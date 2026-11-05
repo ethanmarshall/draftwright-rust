@@ -21,6 +21,10 @@
 //!   ([`draftwright::revision`]). Writes `report.json`, `report.md` (a pull request comment),
 //!   `spec.json` (the carried Spec), `changes.svg` and `changes.png` (the new drawing marked up)
 //!   and `drawing.svg` into *dir*, and prints the verdict
+//! - `draftwright features part.step [--units in|mm] [--analysis a.json]`: every recognised
+//!   feature's sizes and its centre from the part's minimum corner ([`draftwright::inventory`])
+//! - `draftwright check part.step --drawing d.pdf|d.txt [--units in|mm] [--analysis a.json]`:
+//!   which of those sizes and locations a drawing's text does not state
 //! - `draftwright parts part.step`: the file's distinct parts (`{parts: [{part, name,
 //!   product_id, faces, instances}]}`), by which one part of an assembly is chosen
 //! - `draftwright serve`: the JSON-lines service. One request per line on stdin, such as
@@ -67,7 +71,7 @@ fn main() -> ExitCode {
         match args[0].as_str() {
             "--help" | "-h" => {
                 println!(
-                    "draftwright — engineering drawings from STEP\n\nCommands:\n  analyse <step>\n  plan <step> [--spec spec.json]\n  render <step> [--spec spec.json] -o <stem> [--formats svg,pdf,png]\n  review <step> [--spec spec.json]\n  edit <spec.json> <ops.json>\n  spec <drawing>\n  parts <step>\n  pack <step> -o <directory>\n  diff <old.step> <new.step> -o <directory>\n  spec_schema\n  item_options <part_ref> <id> [--spec spec.json]\n  serve\n  mcp-stdio | mcp-http\n\nDiscovery: schemas/spec.json, docs/model.md and docs/mcp.md ship in the release.\nJSON-lines serve: {{\"op\":\"hello\"}} lists operations; spec_schema and item_options use the MCP argument shapes.\nUse --version for the release version."
+                    "draftwright — engineering drawings from STEP\n\nCommands:\n  analyse <step>\n  plan <step> [--spec spec.json]\n  render <step> [--spec spec.json] -o <stem> [--formats svg,pdf,png]\n  review <step> [--spec spec.json]\n  edit <spec.json> <ops.json>\n  spec <drawing>\n  parts <step>\n  features <step> [--units in|mm]\n  check <step> --drawing <drawing.pdf|.txt> [--units in|mm]\n  pack <step> -o <directory>\n  diff <old.step> <new.step> -o <directory>\n  spec_schema\n  item_options <part_ref> <id> [--spec spec.json]\n  serve\n  mcp-stdio | mcp-http\n\nDiscovery: schemas/spec.json, docs/model.md and docs/mcp.md ship in the release.\nJSON-lines serve: {{\"op\":\"hello\"}} lists operations; spec_schema and item_options use the MCP argument shapes.\nUse --version for the release version."
                 );
                 return ExitCode::SUCCESS;
             }
@@ -125,7 +129,7 @@ fn read_json(path: &str) -> Result<Value, Error> {
 
 /// Runs the command, its arguments put as [`api::call`] takes them.
 fn run(args: &[String]) -> Result<Value, Error> {
-    let usage = "usage: draftwright (analyse|plan|render|review|pack|diff|edit|spec|parts|spec_schema|item_options|serve) …";
+    let usage = "usage: draftwright (analyse|plan|render|review|features|check|pack|diff|edit|spec|parts|spec_schema|item_options|serve) …";
     let command = args.first().ok_or_else(|| Error::invalid(usage))?;
     let arg = |i: usize| {
         args.get(i)
@@ -185,6 +189,44 @@ fn run(args: &[String]) -> Result<Value, Error> {
                 })
                 .collect();
             Ok(json!({"parts": parts}))
+        });
+    }
+    if matches!(command.as_str(), "features" | "check") {
+        let unit =
+            draftwright::inventory::Unit::read(flag(args, "--units")).map_err(Error::invalid)?;
+        let drawing = if command == "check" {
+            let path = flag(args, "--drawing").ok_or_else(|| {
+                Error::invalid("check needs --drawing <drawing.pdf | drawing.txt>")
+            })?;
+            Some(
+                draftwright::inventory::drawing_text(std::path::Path::new(path))
+                    .map_err(Error::invalid)?,
+            )
+        } else {
+            None
+        };
+        let given: Option<draftwright::model::Analysis> = if analysis.is_null() {
+            None
+        } else {
+            Some(
+                serde_json::from_value(analysis)
+                    .map_err(|e| Error::invalid(format!("the analysis is not valid: {e}")))?,
+            )
+        };
+        let step = if given.is_none() { Some(arg(1)?) } else { None };
+        return guarded(command, || {
+            let analysis = match given {
+                Some(a) => a,
+                None => api::analyse_part(
+                    std::path::Path::new(step.expect("a STEP file without an analysis")),
+                    part,
+                    Features::Native,
+                )?,
+            };
+            Ok(match &drawing {
+                Some(text) => draftwright::inventory::check_report(&analysis, text, unit),
+                None => draftwright::inventory::report(&analysis, unit),
+            })
         });
     }
     if command == "pack" {

@@ -138,6 +138,29 @@ impl<'a> Thread<'a> {
                     && d - self.major <= below + 1e-10
             })
             .collect();
+        // Under ASME, a Unified thread of this diameter and pitch is named as one (ASME B1.1),
+        // with the same root allowance for an internal model.
+        let unified = crate::standard::asme()
+            .then(|| {
+                crate::standard::UNIFIED.iter().find(|(_, d, tpi)| {
+                    let d = d * crate::standard::MM_PER_INCH;
+                    let p = crate::standard::MM_PER_INCH / tpi;
+                    (p - self.pitch).abs() <= 0.02 * p
+                        && d - self.major >= -0.02 - 1e-10
+                        && d - self.major <= below + 1e-10
+                })
+            })
+            .flatten();
+        if let Some((name, _, _)) = unified {
+            let mut text = (*name).to_string();
+            if self.starts > 1 {
+                text += &format!(" {} STARTS", self.starts);
+            }
+            if self.left {
+                text += "-LH";
+            }
+            return (text, true);
+        }
         let standard = candidates.len() == 1;
         let mut text = if let [(d, p)] = candidates.as_slice() {
             if self.starts == 1 {

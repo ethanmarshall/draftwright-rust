@@ -11,7 +11,11 @@ fn states_mm(text: &str, value: f64) -> bool {
     let inch = text
         .split_whitespace()
         .any(|word| word.eq_ignore_ascii_case("INCH") || word.eq_ignore_ascii_case("INCHES"));
-    super::holes::states(text, value / if inch { 25.4 } else { 1. })
+    if inch {
+        super::holes::states_printed(text, value / 25.4)
+    } else {
+        super::holes::states(text, value)
+    }
 }
 /// A station equation uses the leading nominal, never a tolerance or fit-class number.
 fn nominal_mm(text: &str, value: f64) -> bool {

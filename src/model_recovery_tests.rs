@@ -280,8 +280,9 @@ fn clear_fixed_sheet_finish_preserves_inventory_and_passes_fresh_audit() {
             let mut spec: Spec =
                 serde_json::from_value(serde_json::json!({"sheet":{"size":size,"scale":scale}}))
                     .unwrap();
-            let factor = layout::SCALES
-                .into_iter()
+            let factor = layout::scales()
+                .iter()
+                .copied()
                 .find(|s| scale_name(*s) == scale)
                 .unwrap();
             for (name, detail) in crate::detail::requests(&a, &spec, factor) {

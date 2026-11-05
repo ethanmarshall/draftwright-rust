@@ -59,8 +59,12 @@ pub const AXIS_TOL: f64 = 1.0;
 
 const AXES: [&str; 3] = ["x", "y", "z"];
 
-/// A nominal as live labels print it: shortest within 1e-6, up to three places.
+/// A nominal as live labels print it: shortest within 1e-6, up to three places (in inches
+/// under ASME, [`crate::standard`]).
 pub fn fmt(v: f64) -> String {
+    if crate::standard::asme() {
+        return crate::standard::inch(v);
+    }
     let v = (v * 1e6).round() / 1e6;
     let places = (0..3)
         .find(|&places| {
@@ -113,14 +117,27 @@ pub fn text_diameters(text: &str) -> Vec<f64> {
             j += 1;
         }
         let mut end = digits(j);
-        if end == j {
+        // ASME prints a diameter under an inch without its leading zero (`⌀.250`).
+        let point = end == j && j + 1 < chars.len() && chars[j] == '.';
+        if end == j && !(point && chars[j + 1].is_ascii_digit()) {
             i += 1;
             continue;
         }
         if end + 1 < chars.len() && chars[end] == '.' && chars[end + 1].is_ascii_digit() {
             end = digits(end + 1);
         }
-        out.extend(chars[j..end].iter().collect::<String>().parse::<f64>().ok());
+        // Read back in millimetres: an ASME sheet prints inches.
+        let unit = if crate::standard::asme() {
+            crate::standard::MM_PER_INCH
+        } else {
+            1.0
+        };
+        out.extend(
+            format!("0{}", chars[j..end].iter().collect::<String>())
+                .parse::<f64>()
+                .ok()
+                .map(|v| v * unit),
+        );
         i = end;
     }
     out

@@ -527,6 +527,11 @@ pub fn fmt(v: f64) -> String {
     crate::nominal::format(v)
 }
 
+/// An angle in degrees (or any unitless number) as labels print it; never converted to inches.
+pub fn fmt_angle(v: f64) -> String {
+    crate::nominal::format_angle(v)
+}
+
 type P3 = [f64; 3];
 type P2 = [f64; 2];
 /// What [`plan`] returns: the dimensions, what the spec left out, and the problems.
@@ -1481,7 +1486,7 @@ pub(crate) fn idle_view(
 }
 
 /// [`idle_view`]'s decision for an Analysis and spec, and the paper the drawing with every view
-/// shown takes at its first choice (the size's place in [`crate::layout::PAGES`] and the sheet
+/// shown takes at its first choice (the size's place in [`crate::layout::pages()`] and the sheet
 /// count), which leaving the view out must not exceed ([`crate::sheet_policy`]).
 #[derive(Clone, Copy, Default)]
 pub(crate) struct IdleDecision {
@@ -1522,7 +1527,7 @@ pub(crate) fn idle_decision(analysis: &Analysis, spec: &Spec) -> IdleDecision {
         let Ok(shown) = shown else {
             return IdleDecision::default();
         };
-        let page = crate::layout::PAGES
+        let page = crate::layout::pages()
             .iter()
             .position(|p| p.0 == shown.sheet.size)
             .unwrap_or(usize::MAX);

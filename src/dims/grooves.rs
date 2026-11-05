@@ -227,7 +227,7 @@ pub(super) fn annular(cx: &Context, f: &Feature) -> Result<Vec<Want>, String> {
             if (angle - 90.0).abs() > 1e-3 {
                 out[0]
                     .terms
-                    .extend([word.into(), format!("{}°", fmt(angle))]);
+                    .extend([word.into(), format!("{}°", crate::dims::fmt_angle(angle))]);
                 out[0]
                     .measurements
                     .push(m(&format!("face_groove_{name}.angle"), angle));

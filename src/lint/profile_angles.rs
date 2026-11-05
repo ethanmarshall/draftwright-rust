@@ -657,7 +657,7 @@ pub fn coverage(a: &Analysis, marks: &[Mark]) -> Vec<LintIssue> {
             if claimed.iter().any(|m| {
                 m.text
                     .strip_suffix('°')
-                    .is_some_and(|t| holes::states(t, degrees))
+                    .is_some_and(|t| holes::states_angle(t, degrees))
             }) {
                 return None;
             }

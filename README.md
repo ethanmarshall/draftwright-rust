@@ -36,6 +36,29 @@ the source modules and commands for running one former test file.
 See [docs/wasm.md](docs/wasm.md) for the API, local build, measured sizes, parity test and
 editor migration.
 
+## This fork: ASME Y14.5 in inches
+
+This fork (`ethanmarshall/draftwright-rust`, branch `asme-inch`) adds:
+
+- **ASME mode.** Put `{"sheet": {"standard": "asme"}}` in the Spec. Lengths print in inches to
+  three places with no leading zero, the paper is ANSI A to E with inch scales, the title block
+  says `IN` with the ASME block tolerance, and modelled threads are named as Unified threads.
+  Lint reads the labels in inches, so a review of an ASME drawing finds what an ISO one would.
+  See "Drawing standard" in `docs/model.md`.
+- **`draftwright features part.step`**: every recognised feature's sizes and centre, in inches
+  or mm.
+- **`draftwright check part.step --drawing d.pdf`**: the sizes and hole, boss and slot
+  locations a drawing someone else made does not state. See `docs/inventory.md`.
+- Recognition refusals (`*_refusals`, such as `prismatic_pocket_refusals`) are kept as
+  refusals instead of failing the whole part.
+
+```
+draftwright render part.step --spec asme.json -o out     # asme.json: {"sheet":{"standard":"asme"}}
+draftwright review part.step --spec asme.json
+draftwright features part.step --units in
+draftwright check part.step --drawing part.pdf
+```
+
 ## Using it
 
 A drawing is three JSON documents: the Analysis, the Spec and the Plan. Five stateless

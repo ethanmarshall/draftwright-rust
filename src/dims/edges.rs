@@ -185,7 +185,11 @@ fn edge<'a>(cx: &Context, f: &'a Feature) -> Result<Edge<'a>, String> {
             },
             angle,
         ));
-        vec![fmt(leg1), "×".into(), format!("{}°", fmt(angle))]
+        vec![
+            fmt(leg1),
+            "×".into(),
+            format!("{}°", crate::dims::fmt_angle(angle)),
+        ]
     };
     Ok(Edge {
         feature: f,

@@ -105,6 +105,7 @@ pub fn plan_analysed(analysis: &Analysis, spec: &Spec) -> Result<Plan, Error> {
 /// [`model::plan_recovered`], through the plan cache that `DRAFTWRIGHT_PLAN_CACHE` names, when
 /// set ([`crate::plan_cache`]).
 fn planned(analysis: &Analysis, spec: &Spec) -> Result<Plan, model::Invalid> {
+    let _standard = crate::standard::scope(spec);
     crate::plan_cache::plan_recovered_in(crate::plan_cache::dir().as_deref(), analysis, spec)
 }
 
@@ -425,6 +426,7 @@ pub fn review_analysed(step: &Path, analysis: &Analysis, spec: &Spec) -> Result<
 }
 
 fn reviewed(step: &Path, given: Given, spec: &Spec) -> Result<Review, Error> {
+    let _standard = crate::standard::scope(spec);
     let (analysis, plan, drawings) = drawn(step, given, spec)?;
     let drawing = &drawings[0];
     // Lint judges the drawing against the requirements the plan drew from: the file's PMI with

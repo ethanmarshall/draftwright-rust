@@ -35,7 +35,10 @@ const FORBIDDEN: [&str; 14] = [
 ];
 
 /// The `crate::` paths lint may use.
-const ALLOWED: [&str; 11] = [
+/// `crate::standard` gives only the unit the sheet prints (ISO mm or ASME inches), so lint
+/// reads a label's number in the unit it was written in.
+const ALLOWED: [&str; 12] = [
+    "crate::standard",
     "crate::model::Analysis",
     "crate::bridge",
     "crate::pmi",

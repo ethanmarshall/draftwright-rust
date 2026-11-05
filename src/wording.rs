@@ -34,7 +34,9 @@ pub fn feature(f: &Feature) -> String {
         "slot" => p("width").map(|w| format!("{} wide {kind}", fmt(w))),
         "flat" => p("across").map(|a| format!("{} {kind}", fmt(a))),
         "polygonal_boss" => p("across_flats").map(|a| format!("{} A/F {kind}", fmt(a))),
-        "angled_step" | "paired_ramp_step" => p("angle").map(|a| format!("{}° {kind}", fmt(a))),
+        "angled_step" | "paired_ramp_step" => {
+            p("angle").map(|a| format!("{}° {kind}", crate::dims::fmt_angle(a)))
+        }
         "plate" => p("hi")
             .zip(p("lo"))
             .map(|(hi, lo)| format!("{} thick {kind}", fmt(hi - lo))),

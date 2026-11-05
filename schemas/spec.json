@@ -1240,6 +1240,20 @@
             }
           ]
         },
+        "standard": {
+          "anyOf": [
+            {
+              "enum": [
+                "iso",
+                "asme"
+              ],
+              "description": "Drawing standard: iso (default, millimetres, ISO paper and scales) or asme (ASME Y14.5: every length printed in inches to three places with no leading zero, ANSI A-E paper, inch scales, IN and the ASME block tolerance in the title block, Unified thread names). Sizes may then be given as ANSI letters (A-E)."
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "default_finish": {
           "anyOf": [
             {

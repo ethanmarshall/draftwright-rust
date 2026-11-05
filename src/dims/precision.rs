@@ -35,7 +35,23 @@ pub(crate) fn read<'de, D: serde::Deserializer<'de>>(
 }
 
 /// Explicit precision retains trailing zeroes, including at zero; default formatting is intact.
+/// A length under ASME prints in inches with no leading zero ([`crate::standard`]).
 pub fn format(value: f64, places: u8) -> String {
+    if crate::standard::asme() && !crate::nominal::comparison() {
+        let text = raw(value / crate::standard::MM_PER_INCH, places);
+        return if let Some(rest) = text.strip_prefix("0.") {
+            format!(".{rest}")
+        } else if let Some(rest) = text.strip_prefix("-0.") {
+            format!("-.{rest}")
+        } else {
+            text
+        };
+    }
+    raw(value, places)
+}
+
+/// *value* to *places* decimals, never converted (angles).
+pub fn raw(value: f64, places: u8) -> String {
     let text = format!("{value:.p$}", p = usize::from(places));
     if text.starts_with('-') && text.parse::<f64>() == Ok(0.0) {
         text[1..].into()
@@ -171,7 +187,11 @@ pub(super) fn labels<'a>(
                     .flatten()
                 });
             if let Some(&p) = policy {
-                let text = format(m.value, p);
+                let text = if m.parameter.contains("angle") {
+                    raw(m.value, p)
+                } else {
+                    format(m.value, p)
+                };
                 if let Some(old) = replacements.insert((i, a, b), text.clone())
                     && old != text
                 {

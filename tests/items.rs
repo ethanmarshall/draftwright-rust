@@ -615,6 +615,11 @@ fn every_item_is_labelled_as_it_is_drawn() {
 /// the plan. Each problem the spec can cause and an edit resolve is made, and fixed.
 #[test]
 fn a_problems_fix_resolves_it() {
+    // Needs the sample corpus: skipped without it, a failure when DRAFTWRIGHT_CORPUS_REQUIRED=1.
+    if corpus::dir().is_none() {
+        eprintln!("SKIPPED: a_problems_fix_resolves_it (the corpus is not found)");
+        return;
+    }
     let features = fixture("recognition/plate.json");
     let plate = model::analyse_with(&fixture("parts/plate.step"), Some(&features))
         .unwrap()

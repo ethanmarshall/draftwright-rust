@@ -5,6 +5,7 @@
 
 pub use haecceity;
 
+pub mod ansi_fits;
 pub mod api;
 pub mod arc;
 pub mod blends;

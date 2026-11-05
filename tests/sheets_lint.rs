@@ -67,6 +67,13 @@ fn split_marks_are_covered_once_and_positions_stay_on_their_sheet() {
 
 #[test]
 fn an_address_must_reach_the_drawn_target_zone() {
+    // Needs the sample corpus: skipped without it, a failure when DRAFTWRIGHT_CORPUS_REQUIRED=1.
+    if std::env::var_os("DRAFTWRIGHT_CORPUS").is_none()
+        && std::env::var_os("DRAFTWRIGHT_CORPUS_REQUIRED").is_none_or(|v| v != "1")
+    {
+        eprintln!("SKIPPED: an_address_must_reach_the_drawn_target_zone (the corpus is not found)");
+        return;
+    }
     let step = std::path::PathBuf::from(std::env::var("DRAFTWRIGHT_CORPUS").unwrap())
         .join("nist/nist_ftc_06_asme1_rd.stp");
     let (part, analysis) = model::analyse_native(&step).unwrap();

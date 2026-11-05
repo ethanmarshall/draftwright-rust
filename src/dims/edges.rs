@@ -174,7 +174,10 @@ fn edge<'a>(cx: &Context, f: &'a Feature) -> Result<Edge<'a>, String> {
         "chamfer.length"
     };
     let mut measurements = vec![m(parameter, leg1)];
-    let terms = if c_form(leg1, leg2, angle) {
+    let terms = if c_form(leg1, leg2, angle) && crate::standard::asme() {
+        // ASME Y14.5 states a 45° chamfer by its leg and angle: `.040 X 45°`.
+        vec![fmt(leg1), "X".into(), "45°".into()]
+    } else if c_form(leg1, leg2, angle) {
         vec![format!("C{}", fmt(leg1))]
     } else {
         measurements.push(m(
@@ -187,7 +190,7 @@ fn edge<'a>(cx: &Context, f: &'a Feature) -> Result<Edge<'a>, String> {
         ));
         vec![
             fmt(leg1),
-            "×".into(),
+            if crate::standard::asme() { "X" } else { "×" }.into(),
             format!("{}°", crate::dims::fmt_angle(angle)),
         ]
     };

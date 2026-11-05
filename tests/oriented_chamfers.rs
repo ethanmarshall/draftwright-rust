@@ -27,6 +27,13 @@ fn plan(s: &Spec) -> Plan {
 }
 #[test]
 fn ctc01_consumes_bevel_faces_and_sizes_both_notches_without_duplicate_c50() {
+    // Needs the sample corpus: skipped without it, a failure when DRAFTWRIGHT_CORPUS_REQUIRED=1.
+    if corpus::dir().is_none() {
+        eprintln!(
+            "SKIPPED: ctc01_consumes_bevel_faces_and_sizes_both_notches_without_duplicate_c50 (the corpus is not found)"
+        );
+        return;
+    }
     let a = &ctc().1;
     assert_eq!(
         a.features
@@ -144,6 +151,13 @@ fn ctc01_consumes_bevel_faces_and_sizes_both_notches_without_duplicate_c50() {
 }
 #[test]
 fn notch_dimensions_accept_omit_tolerance_place_and_label_text() {
+    // Needs the sample corpus: skipped without it, a failure when DRAFTWRIGHT_CORPUS_REQUIRED=1.
+    if corpus::dir().is_none() {
+        eprintln!(
+            "SKIPPED: notch_dimensions_accept_omit_tolerance_place_and_label_text (the corpus is not found)"
+        );
+        return;
+    }
     let p = plan(&Spec::default());
     for parameter in [
         "notch.angle",
@@ -219,6 +233,13 @@ fn notch_dimensions_accept_omit_tolerance_place_and_label_text() {
 }
 #[test]
 fn overall_tolerances_do_not_change_profile_requirement_labels() {
+    // Needs the sample corpus: skipped without it, a failure when DRAFTWRIGHT_CORPUS_REQUIRED=1.
+    if corpus::dir().is_none() {
+        eprintln!(
+            "SKIPPED: overall_tolerances_do_not_change_profile_requirement_labels (the corpus is not found)"
+        );
+        return;
+    }
     let p = plan(&Spec::default());
     let q = plan(&parse(json!({"envelope_tolerance":"±1"})));
     for d in p.dimensions.iter().filter(|d| {
@@ -235,6 +256,13 @@ fn overall_tolerances_do_not_change_profile_requirement_labels() {
 
 #[test]
 fn lint_remeasures_new_dimensions_and_rejects_wrong_nominals_and_tolerance_digits() {
+    // Needs the sample corpus: skipped without it, a failure when DRAFTWRIGHT_CORPUS_REQUIRED=1.
+    if corpus::dir().is_none() {
+        eprintln!(
+            "SKIPPED: lint_remeasures_new_dimensions_and_rejects_wrong_nominals_and_tolerance_digits (the corpus is not found)"
+        );
+        return;
+    }
     let (part, a) = ctc();
     let p = plan(&Spec::default());
     let drawing = model::render(
@@ -281,6 +309,11 @@ fn lint_remeasures_new_dimensions_and_rejects_wrong_nominals_and_tolerance_digit
 }
 #[test]
 fn datum_scheme_takes_the_notch_station_once() {
+    // Needs the sample corpus: skipped without it, a failure when DRAFTWRIGHT_CORPUS_REQUIRED=1.
+    if corpus::dir().is_none() {
+        eprintln!("SKIPPED: datum_scheme_takes_the_notch_station_once (the corpus is not found)");
+        return;
+    }
     let p = plan(&Spec::default());
     let id = p
         .dimensions
@@ -340,6 +373,13 @@ fn datum_scheme_takes_the_notch_station_once() {
 
 #[test]
 fn authored_notch_angle_transfers_ownership_and_auto_mode_names_the_existing_owner() {
+    // Needs the sample corpus: skipped without it, a failure when DRAFTWRIGHT_CORPUS_REQUIRED=1.
+    if corpus::dir().is_none() {
+        eprintln!(
+            "SKIPPED: authored_notch_angle_transfers_ownership_and_auto_mode_names_the_existing_owner (the corpus is not found)"
+        );
+        return;
+    }
     use draftwright::model::dimension_geometry::Reference;
     let a = &ctc().1;
     let planes:Vec<_>=a.dimension_references().iter().filter(|(_,rs)| matches!(rs.as_slice(),[Reference::Plane{normal,bounds,..}] if normal[2].abs()<1e-8 && bounds[0][0]< -80. && bounds[1][0]>-140. && bounds[1][1]< -70.)).map(|(k,_)|k.clone()).collect();
@@ -381,6 +421,13 @@ fn authored_notch_angle_transfers_ownership_and_auto_mode_names_the_existing_own
 
 #[test]
 fn native_oriented_records_are_checked_and_non45_callouts_state_both_values() {
+    // Needs the sample corpus: skipped without it, a failure when DRAFTWRIGHT_CORPUS_REQUIRED=1.
+    if corpus::dir().is_none() {
+        eprintln!(
+            "SKIPPED: native_oriented_records_are_checked_and_non45_callouts_state_both_values (the corpus is not found)"
+        );
+        return;
+    }
     let (part, a) = ctc();
     let r = quiddity::correspondence::recognise(part);
     let mut doc = quiddity::recognition::document(&r, part.faces.len());
@@ -448,6 +495,13 @@ fn native_oriented_records_are_checked_and_non45_callouts_state_both_values() {
 
 #[test]
 fn bevel_run_midpoints_do_not_invent_locations_or_force_sheet_enlargement() {
+    // Needs the sample corpus: skipped without it, a failure when DRAFTWRIGHT_CORPUS_REQUIRED=1.
+    if corpus::dir().is_none() {
+        eprintln!(
+            "SKIPPED: bevel_run_midpoints_do_not_invent_locations_or_force_sheet_enlargement (the corpus is not found)"
+        );
+        return;
+    }
     for (file, count, label) in [
         ("mfcadpp/1007.step", 1, "C0.1"),
         ("nist/nist_ctc_04_asme1_rd.stp", 4, "12× C5"),
@@ -478,6 +532,13 @@ fn bevel_run_midpoints_do_not_invent_locations_or_force_sheet_enlargement() {
 
 #[test]
 fn bounded_notches_reserve_acute_arcs_and_leave_dense_general_profiles_alone() {
+    // Needs the sample corpus: skipped without it, a failure when DRAFTWRIGHT_CORPUS_REQUIRED=1.
+    if corpus::dir().is_none() {
+        eprintln!(
+            "SKIPPED: bounded_notches_reserve_acute_arcs_and_leave_dense_general_profiles_alone (the corpus is not found)"
+        );
+        return;
+    }
     for file in [
         "mfcadpp/10020.step",
         "mfcadpp/10046.step",
@@ -677,6 +738,13 @@ fn source_pmi_owns_a_notch_angle_at_another_normal_section_without_duplicate_ink
 
 #[test]
 fn an_unproved_bevel_corner_cannot_replace_the_proven_notch_depth() {
+    // Needs the sample corpus: skipped without it, a failure when DRAFTWRIGHT_CORPUS_REQUIRED=1.
+    if corpus::dir().is_none() {
+        eprintln!(
+            "SKIPPED: an_unproved_bevel_corner_cannot_replace_the_proven_notch_depth (the corpus is not found)"
+        );
+        return;
+    }
     let (part, a) =
         model::analyse_native(&corpus::dir().unwrap().join("mfcadpp/10020.step")).unwrap();
     let p = model::plan_recovered(&a, &Spec::default()).unwrap();
@@ -751,6 +819,13 @@ fn an_unproved_bevel_corner_cannot_replace_the_proven_notch_depth() {
 
 #[test]
 fn notch_dimensions_leave_the_boss_leader_clear_of_hidden_ink_and_witnesses() {
+    // Needs the sample corpus: skipped without it, a failure when DRAFTWRIGHT_CORPUS_REQUIRED=1.
+    if corpus::dir().is_none() {
+        eprintln!(
+            "SKIPPED: notch_dimensions_leave_the_boss_leader_clear_of_hidden_ink_and_witnesses (the corpus is not found)"
+        );
+        return;
+    }
     use draftwright::output::{Curve, Item};
     type Point = [f64; 2];
     fn crosses([a, b]: [Point; 2], [c, d]: [Point; 2]) -> bool {

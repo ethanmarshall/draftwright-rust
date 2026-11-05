@@ -48,7 +48,11 @@ This fork (`ethanmarshall/draftwright-rust`, branch `asme-inch`) adds:
 - **`draftwright features part.step`**: every recognised feature's sizes and centre, in inches
   or mm.
 - **`draftwright check part.step --drawing d.pdf`**: the sizes and hole, boss and slot
-  locations a drawing someone else made does not state. See `docs/inventory.md`.
+  locations a drawing someone else made does not state, following chains, walls, bolt circles
+  and radial holes. `check-set parts/ --drawing set.pdf` checks a whole drawing set, matching
+  sheets by drawing number. See `docs/inventory.md`.
+- **ANSI B4.1 fits** on ASME sheets: `RC1`-`RC9` and `LC1`-`LC11` on a hole or boss print their
+  inch limits. Chamfers print ASME style (`.040 X 45°`), and review findings state inches.
 - Recognition refusals (`*_refusals`, such as `prismatic_pocket_refusals`) are kept as
   refusals instead of failing the whole part.
 
@@ -57,6 +61,7 @@ draftwright render part.step --spec asme.json -o out     # asme.json: {"sheet":{
 draftwright review part.step --spec asme.json
 draftwright features part.step --units in
 draftwright check part.step --drawing part.pdf
+draftwright check-set parts/ --drawing drawings.pdf
 ```
 
 ## Using it

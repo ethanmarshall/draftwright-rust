@@ -129,6 +129,70 @@ pub fn printed(mm: f64) -> f64 {
     if asme() { mm / MM_PER_INCH } else { mm }
 }
 
+/// A finding's text with its millimetre lengths restated in inches, for an ASME sheet's review.
+/// A length is a decimal number (`1.524`, `-173.863`) or a number after a diameter or radius
+/// sign (`ø8`, `R2`); an angle (a number before `°`), a count, an ID's digits (`f:hole:12`, `e43`)
+/// and a scale (`1:2`) are left as they are. `mm` after a converted length becomes `in`. Under ISO
+/// the text is returned unchanged.
+pub fn inch_text(text: &str) -> String {
+    if !asme() {
+        return text.to_string();
+    }
+    let c: Vec<char> = text.chars().collect();
+    let mut out = String::with_capacity(text.len());
+    let mut i = 0;
+    while i < c.len() {
+        let starts = c[i].is_ascii_digit()
+            || (c[i] == '-' && c.get(i + 1).is_some_and(|d| d.is_ascii_digit()));
+        // A radius sign is an `R` that starts its word (`R2.54`, not `e43`'s or `M8`'s letter).
+        let radius = i > 0 && c[i - 1] == 'R' && (i == 1 || !c[i - 2].is_ascii_alphanumeric());
+        let joined = i > 0
+            && !radius
+            && (c[i - 1].is_ascii_alphanumeric() || matches!(c[i - 1], ':' | '_' | '.' | '/'));
+        if !starts || joined {
+            out.push(c[i]);
+            i += 1;
+            continue;
+        }
+        let start = i;
+        if c[i] == '-' {
+            i += 1;
+        }
+        while i < c.len() && c[i].is_ascii_digit() {
+            i += 1;
+        }
+        let mut decimal = false;
+        if i + 1 < c.len() && c[i] == '.' && c[i + 1].is_ascii_digit() {
+            decimal = true;
+            i += 1;
+            while i < c.len() && c[i].is_ascii_digit() {
+                i += 1;
+            }
+        }
+        let token: String = c[start..i].iter().collect();
+        let sized = start > 0 && matches!(c[start - 1], 'ø' | 'Ø' | '⌀' | 'R');
+        let angle = c.get(i) == Some(&'°');
+        let ratio = c.get(i) == Some(&':') || (start > 0 && c[start - 1] == ':');
+        let glued = c
+            .get(i)
+            .is_some_and(|n| n.is_ascii_alphabetic() || *n == '_');
+        let length = (decimal || sized) && !angle && !ratio && !glued;
+        match token.parse::<f64>() {
+            Ok(mm) if length => {
+                out += &inch(mm);
+                // `0.305 mm deep` reads `.012 in deep`.
+                let rest: String = c[i..c.len().min(i + 3)].iter().collect();
+                if rest == " mm" && c.get(i + 3).is_none_or(|n| !n.is_ascii_alphanumeric()) {
+                    out += " in";
+                    i += 3;
+                }
+            }
+            _ => out += &token,
+        }
+    }
+    out
+}
+
 /// A limit deviation in mm, printed in inches to four decimals with its sign (`+.0006`), an
 /// exact zero as `0`.
 pub fn inch_deviation(mm: f64) -> String {
@@ -241,6 +305,29 @@ mod tests {
         assert_eq!(inch_deviation(0.0127), "+.0005");
         assert_eq!(inch_deviation(-0.0254), "-.0010");
         assert_eq!(inch_deviation(0.0), "0");
+    }
+
+    #[test]
+    fn finding_text_restates_lengths_in_inches() {
+        let _g = set(true);
+        assert_eq!(
+            inch_text("open channel f:section_recess:1 1.524 wide, at (-173.863, 0, 7.938)"),
+            "open channel f:section_recess:1 .060 wide, at (-6.845, 0, .313)"
+        );
+        assert_eq!(
+            inch_text("recess 0.305 mm deep (1 of 5)"),
+            "recess .012 in deep (1 of 5)"
+        );
+        assert_eq!(
+            inch_text("requires 122.6° and ø8 R2.54 at 1:2"),
+            "requires 122.6° and ø.315 R.100 at 1:2"
+        );
+        assert_eq!(
+            inch_text("corner f37:e43:e47, 4 hole(s)"),
+            "corner f37:e43:e47, 4 hole(s)"
+        );
+        drop(_g);
+        assert_eq!(inch_text("1.524 wide"), "1.524 wide");
     }
 
     #[test]

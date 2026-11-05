@@ -25,6 +25,9 @@
 //!   feature's sizes and its centre from the part's minimum corner ([`draftwright::inventory`])
 //! - `draftwright check part.step --drawing d.pdf|d.txt [--units in|mm] [--analysis a.json]`:
 //!   which of those sizes and locations a drawing's text does not state
+//! - `draftwright check-set parts/ --drawing set.pdf [--units in|mm]`: `check` for every STEP
+//!   file in a folder against its page of a drawing set, the page found by the drawing number
+//!   the file's name starts with (`SRT-100-118_finger.step` is drawing `SRT-100-118`)
 //! - `draftwright parts part.step`: the file's distinct parts (`{parts: [{part, name,
 //!   product_id, faces, instances}]}`), by which one part of an assembly is chosen
 //! - `draftwright serve`: the JSON-lines service. One request per line on stdin, such as
@@ -71,7 +74,7 @@ fn main() -> ExitCode {
         match args[0].as_str() {
             "--help" | "-h" => {
                 println!(
-                    "draftwright — engineering drawings from STEP\n\nCommands:\n  analyse <step>\n  plan <step> [--spec spec.json]\n  render <step> [--spec spec.json] -o <stem> [--formats svg,pdf,png]\n  review <step> [--spec spec.json]\n  edit <spec.json> <ops.json>\n  spec <drawing>\n  parts <step>\n  features <step> [--units in|mm]\n  check <step> --drawing <drawing.pdf|.txt> [--units in|mm]\n  pack <step> -o <directory>\n  diff <old.step> <new.step> -o <directory>\n  spec_schema\n  item_options <part_ref> <id> [--spec spec.json]\n  serve\n  mcp-stdio | mcp-http\n\nDiscovery: schemas/spec.json, docs/model.md and docs/mcp.md ship in the release.\nJSON-lines serve: {{\"op\":\"hello\"}} lists operations; spec_schema and item_options use the MCP argument shapes.\nUse --version for the release version."
+                    "draftwright — engineering drawings from STEP\n\nCommands:\n  analyse <step>\n  plan <step> [--spec spec.json]\n  render <step> [--spec spec.json] -o <stem> [--formats svg,pdf,png]\n  review <step> [--spec spec.json]\n  edit <spec.json> <ops.json>\n  spec <drawing>\n  parts <step>\n  features <step> [--units in|mm]\n  check <step> --drawing <drawing.pdf|.txt> [--units in|mm]\n  check-set <step folder> --drawing <set.pdf> [--units in|mm]\n  pack <step> -o <directory>\n  diff <old.step> <new.step> -o <directory>\n  spec_schema\n  item_options <part_ref> <id> [--spec spec.json]\n  serve\n  mcp-stdio | mcp-http\n\nDiscovery: schemas/spec.json, docs/model.md and docs/mcp.md ship in the release.\nJSON-lines serve: {{\"op\":\"hello\"}} lists operations; spec_schema and item_options use the MCP argument shapes.\nUse --version for the release version."
                 );
                 return ExitCode::SUCCESS;
             }
@@ -129,7 +132,7 @@ fn read_json(path: &str) -> Result<Value, Error> {
 
 /// Runs the command, its arguments put as [`api::call`] takes them.
 fn run(args: &[String]) -> Result<Value, Error> {
-    let usage = "usage: draftwright (analyse|plan|render|review|features|check|pack|diff|edit|spec|parts|spec_schema|item_options|serve) …";
+    let usage = "usage: draftwright (analyse|plan|render|review|features|check|check-set|pack|diff|edit|spec|parts|spec_schema|item_options|serve) …";
     let command = args.first().ok_or_else(|| Error::invalid(usage))?;
     let arg = |i: usize| {
         args.get(i)
@@ -190,6 +193,81 @@ fn run(args: &[String]) -> Result<Value, Error> {
                 .collect();
             Ok(json!({"parts": parts}))
         });
+    }
+    if command == "check-set" {
+        let unit =
+            draftwright::inventory::Unit::read(flag(args, "--units")).map_err(Error::invalid)?;
+        let dir = std::path::Path::new(arg(1)?);
+        let pdf = flag(args, "--drawing")
+            .ok_or_else(|| Error::invalid("check-set needs --drawing <set.pdf>"))?;
+        let pages = draftwright::inventory::drawing_pages(std::path::Path::new(pdf))
+            .map_err(Error::invalid)?;
+        let mut steps: Vec<std::path::PathBuf> = std::fs::read_dir(dir)
+            .map_err(|e| Error::invalid(format!("cannot read {}: {e}", dir.display())))?
+            .filter_map(|e| e.ok().map(|e| e.path()))
+            .filter(|p| {
+                p.extension().is_some_and(|x| {
+                    x.eq_ignore_ascii_case("step") || x.eq_ignore_ascii_case("stp")
+                })
+            })
+            .collect();
+        steps.sort();
+        let numbers: Vec<String> = steps
+            .iter()
+            .map(|p| draftwright::inventory::drawing_number(p))
+            .collect();
+        let found = draftwright::inventory::match_pages(&numbers, &pages);
+        let mut parts = Vec::new();
+        for ((step, number), page) in steps.iter().zip(&numbers).zip(found) {
+            let name = step
+                .file_name()
+                .map_or(String::new(), |n| n.to_string_lossy().into());
+            let Some(found) = page else {
+                parts.push(json!({ "step": name, "drawing": number, "pages": [],
+                    "error": "no page of the set names this drawing number" }));
+                continue;
+            };
+            let sheets: Vec<usize> = found.pages.iter().map(|i| i + 1).collect();
+            let text: String = found
+                .pages
+                .iter()
+                .map(|&i| pages[i].as_str())
+                .collect::<Vec<_>>()
+                .join("\n");
+            let result = guarded("check", || {
+                let analysis = api::analyse_part(step, None, Features::Native)?;
+                Ok(draftwright::inventory::check_report(&analysis, &text, unit))
+            });
+            let note = (found.how == "mentioned").then_some(
+                "no sheet carries this number in its title block; checked against the page that mentions it",
+            );
+            parts.push(match result {
+                Ok(mut report) => {
+                    report["step"] = json!(name);
+                    report["drawing"] = json!(number);
+                    report["pages"] = json!(sheets);
+                    if let Some(note) = note {
+                        report["page_note"] = json!(note);
+                    }
+                    report
+                }
+                Err(e) => json!({ "step": name, "drawing": number, "pages": sheets,
+                    "error": e.message }),
+            });
+        }
+        let tally = |key: &str| -> u64 {
+            parts
+                .iter()
+                .map(|p| p[key]["not_stated"].as_u64().unwrap_or(0))
+                .sum()
+        };
+        return Ok(json!({
+            "units": match unit { draftwright::inventory::Unit::Inch => "in", _ => "mm" },
+            "pages": pages.len(),
+            "sizes_not_stated": tally("sizes"),
+            "locations_not_stated": tally("locations"),
+            "parts": parts,
+        }));
     }
     if matches!(command.as_str(), "features" | "check") {
         let unit =

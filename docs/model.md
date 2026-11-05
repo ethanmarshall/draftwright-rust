@@ -471,8 +471,13 @@ the part is still read, planned and laid out in millimetres; only what is printe
   `.XX ±.01 .XXX ±.005 ±0.5° ASME Y14.5-2018`;
 - a modelled thread that matches a Unified thread is named as one (`1/4-20 UNC`), and a note's
   thread may be given as a Unified designation (`#10-32 UNF-2B`);
-- tolerance limits print as inch deviations (`+.0005`); ISO 286 fit classes are still named
-  when a fit is asked for (ANSI B4.1 fits are not implemented).
+- tolerance limits print as inch deviations (`+.0005`), a zero limit with its sign (`-.0000`);
+- `features/<id>/fit` also takes an ANSI B4.1 class, `RC1` … `RC9` (running and sliding) or
+  `LC1` … `LC11` (locational clearance), up to 19.69 in ([`src/ansi_fits.rs`](../src/ansi_fits.rs)).
+  A hole takes the class's hole limits, a boss its shaft limits, and the label always states
+  them after the class: `⌀.132 LC2 +.0005 -.0000`. An ISO sheet refuses these classes, and an
+  ISO 286 class (H7, g6) still works on an ASME sheet. The transition, interference and force
+  fits (LT, LN, FN) are not tabulated.
 
 Lint reads labels in the same unit, so an ASME drawing's review reports what an ISO one would.
 

@@ -41,6 +41,15 @@ fn value(a: &Analysis, s: &Spec) -> Value {
 
 #[test]
 fn r5_assigned_section_keeps_parent_scale_and_principals() {
+    // Needs the sample corpus: skipped without it, a failure when DRAFTWRIGHT_CORPUS_REQUIRED=1.
+    if std::env::var_os("DRAFTWRIGHT_CORPUS").is_none()
+        && std::env::var_os("DRAFTWRIGHT_CORPUS_REQUIRED").is_none_or(|v| v != "1")
+    {
+        eprintln!(
+            "SKIPPED: r5_assigned_section_keeps_parent_scale_and_principals (the corpus is not found)"
+        );
+        return;
+    }
     let a = analysed("nist/nist_ftc_06_asme1_rd.stp");
     let s =
         spec(json!({"sheet":{"size":"A1"},"sheets":{"max":2},"views":{"section_aa":{"sheet":2}}}));
@@ -347,6 +356,15 @@ fn r5_datum_rule_uses_sheets_instead_of_view_names() {
 
 #[test]
 fn r5_cross_reference_check_catches_either_missing_direction() {
+    // Needs the sample corpus: skipped without it, a failure when DRAFTWRIGHT_CORPUS_REQUIRED=1.
+    if std::env::var_os("DRAFTWRIGHT_CORPUS").is_none()
+        && std::env::var_os("DRAFTWRIGHT_CORPUS_REQUIRED").is_none_or(|v| v != "1")
+    {
+        eprintln!(
+            "SKIPPED: r5_cross_reference_check_catches_either_missing_direction (the corpus is not found)"
+        );
+        return;
+    }
     let a = analysed("nist/nist_ftc_06_asme1_rd.stp");
     let mut p = model::plan_recovered(
         &a,
@@ -395,6 +413,15 @@ fn r5_zones_follow_the_iso_grid_and_skip_i_and_o() {
 
 #[test]
 fn r5_parent_relative_groups_move_whole_and_keep_their_gap() {
+    // Needs the sample corpus: skipped without it, a failure when DRAFTWRIGHT_CORPUS_REQUIRED=1.
+    if std::env::var_os("DRAFTWRIGHT_CORPUS").is_none()
+        && std::env::var_os("DRAFTWRIGHT_CORPUS_REQUIRED").is_none_or(|v| v != "1")
+    {
+        eprintln!(
+            "SKIPPED: r5_parent_relative_groups_move_whole_and_keep_their_gap (the corpus is not found)"
+        );
+        return;
+    }
     let a = analysed("nist/nist_ftc_06_asme1_rd.stp");
     let s = spec(
         json!({"sheets":{"max":2},"views":{"section_aa":{"sheet":2},"iso":{"place":{"relative_to":"section_aa","side":"right","gap":12,"align":"middle"}}}}),
@@ -542,6 +569,15 @@ fn r5_off_sheet_hole_table_keeps_all_rows_and_balloons() {
 
 #[test]
 fn r5_moving_the_table_does_not_create_balloon_room() {
+    // Needs the sample corpus: skipped without it, a failure when DRAFTWRIGHT_CORPUS_REQUIRED=1.
+    if std::env::var_os("DRAFTWRIGHT_CORPUS").is_none()
+        && std::env::var_os("DRAFTWRIGHT_CORPUS_REQUIRED").is_none_or(|v| v != "1")
+    {
+        eprintln!(
+            "SKIPPED: r5_moving_the_table_does_not_create_balloon_room (the corpus is not found)"
+        );
+        return;
+    }
     use draftwright::hole_table::{self, TableOutcome};
     let a = analysed("nist/nist_ctc_02_asme1_rc.stp");
     let mut p = model::plan(&a, &Spec::default()).unwrap();
@@ -575,6 +611,15 @@ fn r5_moving_the_table_does_not_create_balloon_room() {
 
 #[test]
 fn r5_a_further_sheet_before_a_smaller_scale_uses_cumulative_prefixes() {
+    // Needs the sample corpus: skipped without it, a failure when DRAFTWRIGHT_CORPUS_REQUIRED=1.
+    if std::env::var_os("DRAFTWRIGHT_CORPUS").is_none()
+        && std::env::var_os("DRAFTWRIGHT_CORPUS_REQUIRED").is_none_or(|v| v != "1")
+    {
+        eprintln!(
+            "SKIPPED: r5_a_further_sheet_before_a_smaller_scale_uses_cumulative_prefixes (the corpus is not found)"
+        );
+        return;
+    }
     let a = analysed("gramel/string_post.step");
     let base =
         spec(json!({"sheet":{"size":"A4"},"hole_table":"never","tables":overflow::tables()}));
@@ -622,6 +667,15 @@ fn r5_a_further_sheet_before_a_smaller_scale_uses_cumulative_prefixes() {
 
 #[test]
 fn r5_first_usable_single_sheet_precedes_further_paper_and_sheets() {
+    // Needs the sample corpus: skipped without it, a failure when DRAFTWRIGHT_CORPUS_REQUIRED=1.
+    if std::env::var_os("DRAFTWRIGHT_CORPUS").is_none()
+        && std::env::var_os("DRAFTWRIGHT_CORPUS_REQUIRED").is_none_or(|v| v != "1")
+    {
+        eprintln!(
+            "SKIPPED: r5_first_usable_single_sheet_precedes_further_paper_and_sheets (the corpus is not found)"
+        );
+        return;
+    }
     let a = analysed("gramel/string_post.step");
     let s = spec(
         json!({"sheets":{"max":2,"smallest_scale":"5:1"},"hole_table":"never","tables":overflow::tables()}),
@@ -642,6 +696,15 @@ fn r5_first_usable_single_sheet_precedes_further_paper_and_sheets() {
 
 #[test]
 fn r5_a_helpful_prefix_spends_the_second_sheet_to_reach_the_floor() {
+    // Needs the sample corpus: skipped without it, a failure when DRAFTWRIGHT_CORPUS_REQUIRED=1.
+    if std::env::var_os("DRAFTWRIGHT_CORPUS").is_none()
+        && std::env::var_os("DRAFTWRIGHT_CORPUS_REQUIRED").is_none_or(|v| v != "1")
+    {
+        eprintln!(
+            "SKIPPED: r5_a_helpful_prefix_spends_the_second_sheet_to_reach_the_floor (the corpus is not found)"
+        );
+        return;
+    }
     // Until #163 the 10:1 trial on the allocated sheets was refused for an empty band past the
     // border, so one sheet at 5:1 was kept, below the authored floor. Judged by its ink, moving
     // the isometric and the section reaches the floor, so the second sheet is spent.
@@ -670,6 +733,15 @@ fn r5_a_helpful_prefix_spends_the_second_sheet_to_reach_the_floor() {
 
 #[test]
 fn r5_an_unhelpful_prefix_does_not_spend_an_extra_sheet() {
+    // Needs the sample corpus: skipped without it, a failure when DRAFTWRIGHT_CORPUS_REQUIRED=1.
+    if std::env::var_os("DRAFTWRIGHT_CORPUS").is_none()
+        && std::env::var_os("DRAFTWRIGHT_CORPUS_REQUIRED").is_none_or(|v| v != "1")
+    {
+        eprintln!(
+            "SKIPPED: r5_an_unhelpful_prefix_does_not_spend_an_extra_sheet (the corpus is not found)"
+        );
+        return;
+    }
     // With the section kept on sheet 1, the only prefix moves the isometric, which leaves the
     // drawing at 5:1 with the same finding: the second sheet does not help and is not spent.
     let a = analysed("gramel/string_post.step");
@@ -715,6 +787,15 @@ fn r5_an_authored_sheet_label_is_reported_on_a_multi_sheet_plan() {
 
 #[test]
 fn r5_narrow_section_blocks_reserve_caption_and_reference_width() {
+    // Needs the sample corpus: skipped without it, a failure when DRAFTWRIGHT_CORPUS_REQUIRED=1.
+    if std::env::var_os("DRAFTWRIGHT_CORPUS").is_none()
+        && std::env::var_os("DRAFTWRIGHT_CORPUS_REQUIRED").is_none_or(|v| v != "1")
+    {
+        eprintln!(
+            "SKIPPED: r5_narrow_section_blocks_reserve_caption_and_reference_width (the corpus is not found)"
+        );
+        return;
+    }
     let a = analysed("nist/nist_ftc_06_asme1_rd.stp");
     let s = spec(json!({
         "sheet":{"size":"A4","scale":"1:500"},"sheets":{"max":2},
@@ -743,6 +824,15 @@ fn r5_narrow_section_blocks_reserve_caption_and_reference_width() {
 
 #[test]
 fn r5_allowing_extra_sheets_preserves_the_finished_sheet() {
+    // Needs the sample corpus: skipped without it, a failure when DRAFTWRIGHT_CORPUS_REQUIRED=1.
+    if std::env::var_os("DRAFTWRIGHT_CORPUS").is_none()
+        && std::env::var_os("DRAFTWRIGHT_CORPUS_REQUIRED").is_none_or(|v| v != "1")
+    {
+        eprintln!(
+            "SKIPPED: r5_allowing_extra_sheets_preserves_the_finished_sheet (the corpus is not found)"
+        );
+        return;
+    }
     for name in [
         "mfcadpp/1000.step",
         "gramel/GRM-03_thumbwheel_drive_screw.step",
@@ -775,6 +865,15 @@ fn r5_allowing_extra_sheets_preserves_the_finished_sheet() {
 
 #[test]
 fn r5_remote_section_retains_parent_cutting_plane_ink() {
+    // Needs the sample corpus: skipped without it, a failure when DRAFTWRIGHT_CORPUS_REQUIRED=1.
+    if std::env::var_os("DRAFTWRIGHT_CORPUS").is_none()
+        && std::env::var_os("DRAFTWRIGHT_CORPUS_REQUIRED").is_none_or(|v| v != "1")
+    {
+        eprintln!(
+            "SKIPPED: r5_remote_section_retains_parent_cutting_plane_ink (the corpus is not found)"
+        );
+        return;
+    }
     let root = std::env::var("DRAFTWRIGHT_CORPUS").unwrap();
     let (part, a) =
         model::analyse_native(&Path::new(&root).join("gramel/string_post.step")).unwrap();

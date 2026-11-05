@@ -555,6 +555,20 @@ pub fn lint(analysis: &Analysis, drawing: &Drawing) -> Vec<LintIssue> {
 
 /// Coverage over all sheets, counted once. Text-run indices remain local to each annotation
 /// until they are rebased into this drawing-wide evidence inventory; no positions are audited.
+/// *issues* with their message, evidence and fix restated in the sheet's unit: inches on an ASME
+/// sheet ([`crate::standard::inch_text`]). IDs keep their millimetre digits, so edits and
+/// waivers that name them keep working.
+pub fn in_sheet_units(issues: &mut [LintIssue]) {
+    if !crate::standard::asme() {
+        return;
+    }
+    for i in issues {
+        i.message = crate::standard::inch_text(&i.message);
+        i.evidence = i.evidence.as_deref().map(crate::standard::inch_text);
+        i.fix = i.fix.as_deref().map(crate::standard::inch_text);
+    }
+}
+
 pub fn lint_sheets(analysis: &Analysis, drawings: &[Drawing]) -> Vec<LintIssue> {
     let Some(first) = drawings.first() else {
         return check(analysis, &[]);

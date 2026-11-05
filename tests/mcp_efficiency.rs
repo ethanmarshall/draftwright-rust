@@ -47,6 +47,13 @@ fn query(summary: &Value, id: &str) -> Value {
 
 #[test]
 fn summary_points_to_live_task_items_within_wire_budget() {
+    // Needs the sample corpus: skipped without it, a failure when DRAFTWRIGHT_CORPUS_REQUIRED=1.
+    if corpus::dir().is_none() {
+        eprintln!(
+            "SKIPPED: summary_points_to_live_task_items_within_wire_budget (the corpus is not found)"
+        );
+        return;
+    }
     for part in ["plate", "m10127", "grm03", "ctc01"] {
         let (cache, summary) = open(part, part);
         let keys = summary["key_items"]
@@ -82,6 +89,13 @@ fn summary_points_to_live_task_items_within_wire_budget() {
 
 #[test]
 fn options_list_valid_hole_fits_and_every_dimension_field() {
+    // Needs the sample corpus: skipped without it, a failure when DRAFTWRIGHT_CORPUS_REQUIRED=1.
+    if corpus::dir().is_none() {
+        eprintln!(
+            "SKIPPED: options_list_valid_hole_fits_and_every_dimension_field (the corpus is not found)"
+        );
+        return;
+    }
     let (cache, summary) = open("fits", "m10127");
     let result = call(
         &cache,
@@ -165,6 +179,13 @@ fn options_explain_sheet_and_bare_view_keys() {
 
 #[test]
 fn refusals_give_valid_choices_and_an_executable_corrected_op() {
+    // Needs the sample corpus: skipped without it, a failure when DRAFTWRIGHT_CORPUS_REQUIRED=1.
+    if corpus::dir().is_none() {
+        eprintln!(
+            "SKIPPED: refusals_give_valid_choices_and_an_executable_corrected_op (the corpus is not found)"
+        );
+        return;
+    }
     let (cache, summary) = open("refusals", "m10127");
     for bad in [
         json!({"op":"set","path":"dimensions/d:f:hole:1~1bore.diameter/tolerance","value":"H7"}),
@@ -197,6 +218,13 @@ fn refusals_give_valid_choices_and_an_executable_corrected_op() {
 
 #[test]
 fn one_feature_problem_query_returns_all_member_fixes() {
+    // Needs the sample corpus: skipped without it, a failure when DRAFTWRIGHT_CORPUS_REQUIRED=1.
+    if corpus::dir().is_none() {
+        eprintln!(
+            "SKIPPED: one_feature_problem_query_returns_all_member_fixes (the corpus is not found)"
+        );
+        return;
+    }
     let (cache, summary) = open("feature-problems", "ctc01");
     // Use authored bad pins to exercise member fixes. The two historical
     // corridor overruns are correctly eliminated by ISSUE-563-b.
@@ -309,6 +337,13 @@ fn one_feature_problem_query_returns_all_member_fixes() {
 // placement, as a client fixing every problem involving this feature does.
 #[test]
 fn verbose_feature_problem_stays_actionable_and_can_be_cleared() {
+    // Needs the sample corpus: skipped without it, a failure when DRAFTWRIGHT_CORPUS_REQUIRED=1.
+    if corpus::dir().is_none() {
+        eprintln!(
+            "SKIPPED: verbose_feature_problem_stays_actionable_and_can_be_cleared (the corpus is not found)"
+        );
+        return;
+    }
     let (cache, summary) = open("actionable-feature", "ctc01");
     let query = json!({"part_ref":summary["part_ref"],
         "spec_version":summary["spec_version"],"problem_filter":{"feature":"f:slot:1"}});
@@ -399,6 +434,13 @@ fn verbose_feature_problem_stays_actionable_and_can_be_cleared() {
 
 #[test]
 fn inspection_batches_a_filtered_problem_page_with_registration() {
+    // Needs the sample corpus: skipped without it, a failure when DRAFTWRIGHT_CORPUS_REQUIRED=1.
+    if corpus::dir().is_none() {
+        eprintln!(
+            "SKIPPED: inspection_batches_a_filtered_problem_page_with_registration (the corpus is not found)"
+        );
+        return;
+    }
     let (cache, summary) = open("inspect-problems", "ctc01");
     let result = call(
         &cache,
@@ -474,6 +516,13 @@ fn inspection_batches_a_filtered_problem_page_with_registration() {
 
 #[test]
 fn fit_options_respect_nominal_table_boundaries() {
+    // Needs the sample corpus: skipped without it, a failure when DRAFTWRIGHT_CORPUS_REQUIRED=1.
+    if corpus::dir().is_none() {
+        eprintln!(
+            "SKIPPED: fit_options_respect_nominal_table_boundaries (the corpus is not found)"
+        );
+        return;
+    }
     for nominal in [0.0, 0.001, 250.0, 250.001] {
         let step = corpus::dir().unwrap().join("mfcadpp/10127.step");
         let (part, mut analysis) = draftwright::model::analyse_native(&step).unwrap();

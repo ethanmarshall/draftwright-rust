@@ -390,7 +390,12 @@ pub(super) fn apply(
                 if members.len() > 1 {
                     terms.push(format!("{}×", members.len()));
                 }
-                terms.push(format!("C{}", fmt(leg)));
+                if crate::standard::asme() {
+                    // ASME Y14.5: `.040 X 45°`.
+                    terms.extend([fmt(leg), "X".into(), "45°".into()]);
+                } else {
+                    terms.push(format!("C{}", fmt(leg)));
+                }
                 // atan2 differs in its last bits between native and WASM libm; the plan's value
                 // must not.
                 let angle = |c: &Corner| (c.degrees() * 1e9).round() / 1e9;

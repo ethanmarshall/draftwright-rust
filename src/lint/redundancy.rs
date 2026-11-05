@@ -429,7 +429,7 @@ pub fn references(a: &Analysis, marks: &[Mark]) -> Vec<LintIssue> {
 
 /// Whether reference text *text* prints a tolerance: a `±` band, a `+0.1 -0.02` deviation pair
 /// or an ISO 286 class after its size (`H7`, `h6`, `js9`): one of haecceity's fit table's classes
-/// and grades.
+/// and grades; on an ASME sheet an inch deviation (`+.0010`) or an ANSI B4.1 class (`RC4`).
 fn toleranced(text: &str) -> bool {
     use haecceity::presentation::tolerance::{GRADES, HOLE_CLASSES, SHAFT_CLASSES};
     text.contains('±')
@@ -438,7 +438,10 @@ fn toleranced(text: &str) -> bool {
             .any(|t| {
                 let digits = t.trim_start_matches(|c: char| c.is_ascii_alphabetic());
                 let letters = &t[..t.len() - digits.len()];
-                (t.starts_with('+') && t[1..].starts_with(|c: char| c.is_ascii_digit()))
+                (t.starts_with('+') && t[1..].starts_with(|c: char| c.is_ascii_digit() || c == '.'))
+                    // An ANSI B4.1 class on an ASME sheet (`RC4`, `LC11`).
+                    || (matches!(letters, "RC" | "LC")
+                        && digits.parse::<u32>().is_ok_and(|g| (1..=11).contains(&g)))
                     || (HOLE_CLASSES
                         .iter()
                         .chain(&SHAFT_CLASSES)

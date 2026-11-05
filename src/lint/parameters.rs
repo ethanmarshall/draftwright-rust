@@ -194,7 +194,13 @@ pub fn coverage(
                 continue;
             }
         };
-        let states = |m: &&Mark| values.iter().all(|&v| holes::states(&m.text, v));
+        // A value is a length or an angle (a chamfer's): an ASME sheet prints only the length in
+        // inches, so either reading counts (they are one reading on an ISO sheet).
+        let states = |m: &&Mark| {
+            values
+                .iter()
+                .all(|&v| holes::states(&m.text, v) || holes::states_angle(&m.text, v))
+        };
         if claiming.iter().any(states) {
             continue;
         }

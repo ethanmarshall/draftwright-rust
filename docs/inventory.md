@@ -17,11 +17,34 @@ draftwright features SRT-100-118_pressure_finger.step --units in
 ## `draftwright check part.step --drawing drawing.pdf`
 
 Reads the drawing's text (a `.pdf` through `pdftotext` from poppler-utils, or a `.txt`) and
-reports each size and each hole, boss and slot location that the text does not state as a
-number. A number counts at one to four places, with or without a leading zero; a diameter is
-also found as its radius and a radius as its diameter; a location is also found from the far
-side or the centre; a hole on a bolt circle about the part's centre is located by the circle.
+reports each size and each hole, boss and slot location that the drawing does not state.
 
-A location in `not_stated` is a prompt to look, not an error: a chain or baseline of dimensions
-can fix it without printing it as one number. For a multi-sheet PDF, pass the part's own page
-(`pdftotext -f N -l N -layout set.pdf part.txt`).
+**Sizes** count when the text holds the number at one to four places, with or without a
+leading zero. A diameter is also found as its radius and a radius as its diameter. A THRU hole's
+depth and a countersink's depth are not asked for.
+
+**Locations** must be printed at the precision they are (`.297` or `.2970`, never `.3`), and a
+bare whole number never counts, so a page dense with numbers does not locate a part by accident.
+A coordinate along the feature's own axis, on an edge or on the centre plane needs no number. A
+location is found when it is stated:
+
+- from an edge or the centre;
+- from one of the part's own walls (a plate's face, a step's wall, a level) that the drawing
+  locates from an edge, as a hole measured from a flange's inner face;
+- as a chain from another located feature (the distance between them is printed), or on the
+  same centreline as one;
+- as the radius or diameter of a circle about the centre, a corner, an edge's midpoint or a
+  located feature (a bolt circle, holes on an arc); its angle is read by eye;
+- by its angle, for a radial hole whose axis runs through the part's centre (a wheel's rim holes).
+
+`located_through` lists the locations found by a chain, a wall, a circle or an angle, with how.
+`not_stated` lists the rest: check those by eye.
+
+## `draftwright check-set parts/ --drawing set.pdf`
+
+`check` for every STEP file in a folder against its sheets of a drawing set, in one run. A
+STEP file's drawing number is its name up to the first `_` (`SRT-100-118_pressure_finger.step` is
+`SRT-100-118`). A sheet belongs to the number its title block prints, the number printed last on
+the page; a drawing of several sheets is checked against all of them. A part no title block
+carries is checked against the page that mentions it with the fewest other numbers, and says so
+(`page_note`). The result totals what is not stated across the set and lists each part's report.

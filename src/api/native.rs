@@ -437,8 +437,10 @@ fn reviewed(step: &Path, given: Given, spec: &Spec) -> Result<Review, Error> {
     let svg = drawing.svg();
     let drawing_consumer = crate::evaluation::drawing_consumer(analysis, Ok(&drawings));
     let sheets = drawings.iter().skip(1).map(Drawing::svg).collect();
-    let lint = lint::lint_sheets(analysis, &drawings);
-    let structural = lint::structural::check_sheets(&drawings);
+    let mut lint = lint::lint_sheets(analysis, &drawings);
+    let mut structural = lint::structural::check_sheets(&drawings);
+    lint::in_sheet_units(&mut lint);
+    lint::in_sheet_units(&mut structural);
     let summary = crate::finding::Summary::new(
         plan.problems
             .iter()

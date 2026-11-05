@@ -453,13 +453,21 @@ pub fn principal_axes(c: &Corner) -> Option<(usize, usize)> {
     Some((k, plane[usize::from(plane[0] == k)]))
 }
 
-/// Whether *text* is a chamfer callout of size *leg*: `C<leg>`, optionally counted (`4× C21.075`).
+/// Whether *text* is a chamfer callout of size *leg*: `C<leg>` or ASME's `<leg> X 45°`, optionally
+/// counted (`4× C21.075`).
 pub fn states_chamfer(text: &str, leg: f64) -> bool {
     let t = text.trim();
     let t = t
         .split_once("× ")
         .filter(|(n, _)| n.parse::<usize>().is_ok())
         .map_or(t, |(_, rest)| rest);
+    // ASME's `.040 X 45°` (the leg then a 45° angle).
+    if let Some((size, angle)) = t.split_once(" X ").or_else(|| t.split_once(" × "))
+        && angle.trim().trim_end_matches('°').parse::<f64>() == Ok(45.0)
+        && size.trim().parse::<f64>().is_ok()
+    {
+        return holes::states(size.trim(), leg);
+    }
     t.strip_prefix('C')
         .filter(|v| v.parse::<f64>().is_ok())
         .is_some_and(|v| holes::states(v, leg))

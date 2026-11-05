@@ -191,6 +191,15 @@ fn review_exposes_later_sheets_and_keeps_sheet_one_furniture() {
 
 #[test]
 fn remote_section_has_its_hatch_and_caption_on_sheet_two() {
+    // Needs the sample corpus: skipped without it, a failure when DRAFTWRIGHT_CORPUS_REQUIRED=1.
+    if std::env::var_os("DRAFTWRIGHT_CORPUS").is_none()
+        && std::env::var_os("DRAFTWRIGHT_CORPUS_REQUIRED").is_none_or(|v| v != "1")
+    {
+        eprintln!(
+            "SKIPPED: remote_section_has_its_hatch_and_caption_on_sheet_two (the corpus is not found)"
+        );
+        return;
+    }
     let corpus = std::env::var("DRAFTWRIGHT_CORPUS").unwrap();
     let path = Path::new(&corpus).join("nist/nist_ftc_06_asme1_rd.stp");
     let s = spec(json!({"sheets":{"max":2},"views":{"section_aa":{"sheet":2}}}));

@@ -12,6 +12,9 @@
 //!   from draftwright's table (`fits.py`: holes H, G, F; shafts h, g, f, js, k, n, p; grades 5 to
 //!   11; nominal sizes up to 250 mm). It is printed after the diameter of the callout that states
 //!   the feature's size, as the class alone (`⌀8.1 H7 THRU`) by default; `sheet/fit_deviations: true` adds stacked deviations.
+//!   On an ASME sheet a fit may instead be an ANSI B4.1 class (`RC1` … `RC9`, `LC1` … `LC11`,
+//!   [`crate::ansi_fits`]): the hole takes the class's hole limits and a boss its shaft limits,
+//!   always printed as inch deviations after the class (`⌀.500 RC4 +.0010 0`).
 //!
 //! A band is withheld, and the plan says so, when the sheet cannot state it truthfully:
 //! - **a band of nothing** (ARCH0019-2): with the authored digits kept, only a band whose every
@@ -49,11 +52,12 @@ pub(super) fn with_limits(code: &str, (lower, upper): (f64, f64)) -> String {
 /// under ASME converted to inches, four decimals ([`crate::standard::inch_deviation`]).
 pub(super) fn limits_term((lower, upper): (f64, f64)) -> String {
     if crate::standard::asme() {
-        return format!(
-            "{}\n{}",
-            crate::standard::inch_deviation(upper),
-            crate::standard::inch_deviation(lower)
-        );
+        // ASME Y14.5 inch practice: a zero limit keeps its sign and places (`+.0010 -.0000`).
+        let signed = |v: f64, sign: char| match crate::standard::inch_deviation(v).as_str() {
+            "0" => format!("{sign}.0000"),
+            text => text.to_string(),
+        };
+        return format!("{}\n{}", signed(upper, '+'), signed(lower, '-'));
     }
     haecceity::presentation::tolerance::limits_term((lower, upper))
 }
@@ -69,6 +73,9 @@ const FORMS: [&str; 2] = ["±0.05", "+0.1 -0.02"];
 
 /// Supported classes at this feature's size, from the same table used by validation.
 pub(crate) fn choices(kind: &str, nominal: f64) -> Vec<String> {
+    if crate::standard::asme() && matches!(kind, "hole" | "boss") {
+        return crate::ansi_fits::choices(nominal);
+    }
     let letters: &[&str] = match kind {
         "hole" => &HOLE_CLASSES,
         "boss" => &SHAFT_CLASSES,
@@ -158,6 +165,16 @@ pub(crate) fn check(spec: &Spec) -> Result<(), Invalid> {
     }
     for (id, entry) in &spec.dimensions {
         if let Some(code) = &entry.fit {
+            if crate::ansi_fits::class(code).is_some() {
+                return Err(Invalid {
+                    path: None,
+                    also: Vec::new(),
+                    message: format!(
+                        "{code:?} on {id} is an ANSI B4.1 fit, which is set on a hole or a boss (features/<id>/fit); give this dimension a tolerance."
+                    ),
+                    choices: vec![],
+                });
+            }
             fit(code).map_err(|why| Invalid {
                 path: None,
                 also: Vec::new(),
@@ -192,7 +209,9 @@ pub(crate) fn check(spec: &Spec) -> Result<(), Invalid> {
         }
     }
     for (id, entry) in &spec.features {
-        if let Some(code) = &entry.fit {
+        if let Some(code) = &entry.fit
+            && crate::ansi_fits::class(code).is_none()
+        {
             fit(code).map_err(|why| Invalid {
                 path: None,
                 also: Vec::new(),
@@ -288,6 +307,8 @@ pub(super) fn apply(
     // Each fit, on a feature that can take it, at its size.
     let mut fits: BTreeMap<&str, &str> = BTreeMap::new();
     let mut nominals: BTreeMap<&str, f64> = BTreeMap::new();
+    // An ANSI B4.1 class's side: the hole's limits or the shaft's ([`crate::ansi_fits`]).
+    let mut sides: BTreeMap<&str, bool> = BTreeMap::new();
     for (id, entry) in &spec.features {
         let Some(code) = entry.fit.as_deref() else {
             continue;
@@ -325,9 +346,41 @@ pub(super) fn apply(
                 choices: vec![],
             });
         }
+        let hole = f.kind == "hole";
+        if crate::ansi_fits::class(code).is_some() {
+            if !crate::standard::asme() {
+                return Err(Invalid {
+                    path: None,
+                    also: Vec::new(),
+                    message: format!(
+                        "{code:?} on {id:?} is an ANSI B4.1 inch fit; it needs sheet/standard asme. An ISO sheet takes an ISO 286 class (H7, g6)."
+                    ),
+                    choices: vec![],
+                });
+            }
+            let d = f.parameters.get("diameter").and_then(|v| v.as_f64());
+            match d.filter(|&d| crate::ansi_fits::limits(code, d, hole).is_some()) {
+                Some(d) => {
+                    fits.insert(id, code);
+                    nominals.insert(id, d);
+                    sides.insert(id, hole);
+                }
+                None => {
+                    return Err(Invalid {
+                        path: None,
+                        also: Vec::new(),
+                        message: format!(
+                            "The fit {code:?} of {id:?} cannot be resolved: its nominal ⌀{} is outside ANSI B4.1's table (up to 19.69 in); give its dimension a tolerance instead.",
+                            d.map_or("?".into(), fmt)
+                        ),
+                        choices: vec![],
+                    });
+                }
+            }
+            continue;
+        }
         // Invariant: check validated this same immutable fit code before apply.
         let (letters, grade) = fit(code).expect("checked");
-        let hole = f.kind == "hole";
         if hole != HOLE_CLASSES.contains(&letters) {
             let other = if hole {
                 letters.to_uppercase()
@@ -421,6 +474,17 @@ pub(super) fn apply(
             });
         }
         let band = if let Some(code) = extent_fit {
+            if crate::ansi_fits::class(code).is_some() {
+                return Err(Invalid {
+                    path: None,
+                    also: Vec::new(),
+                    message: format!(
+                        "{code:?} on {} is an ANSI B4.1 fit, which is set on a hole or a boss (features/<id>/fit); give this extent a tolerance.",
+                        w.id
+                    ),
+                    choices: vec![],
+                });
+            }
             let limits = deviations(code, w.value).ok_or_else(|| Invalid {
                 path: None,
                 also: Vec::new(),
@@ -465,10 +529,12 @@ pub(super) fn apply(
             if member_fits.iter().all(|f| *f == Some(first)) {
                 given.push("fit".to_string());
                 w.basis += &format!("; its fit is the spec's ({})", members.join(", "));
-                let limits = nominals
-                    .get(members[0].as_str())
-                    .and_then(|&d| deviations(first, d))
-                    .filter(|_| limits_shown(spec));
+                // An ANSI class always states its limits: ASME practice tolerances the size.
+                let ansi = sides.get(members[0].as_str()).copied();
+                let limits = nominals.get(members[0].as_str()).and_then(|&d| match ansi {
+                    Some(hole) => crate::ansi_fits::limits(first, d, hole),
+                    None => deviations(first, d).filter(|_| limits_shown(spec)),
+                });
                 Some(limits.map_or(first.to_string(), |l| with_limits(first, l)))
             } else {
                 None

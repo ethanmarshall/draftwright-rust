@@ -180,6 +180,13 @@ fn corridor(p: &Plan, d: &draftwright::dims::PlannedDimension) {
 
 #[test]
 fn every_source_and_explicit_linear_corridor_is_reserved() {
+    // Needs the sample corpus: skipped without it, a failure when DRAFTWRIGHT_CORPUS_REQUIRED=1.
+    if corpus::dir().is_none() {
+        eprintln!(
+            "SKIPPED: every_source_and_explicit_linear_corridor_is_reserved (the corpus is not found)"
+        );
+        return;
+    }
     let dir = corpus::dir().unwrap();
     for f in [
         "cadgenbench_inputs/cgb245.step",
@@ -490,6 +497,13 @@ fn gap_tangent_and_outside_sections_are_reported_without_false_cut_ink() {
 
 #[test]
 fn explicit_dimensions_that_reflow_keep_their_reserved_corridors() {
+    // Needs the sample corpus: skipped without it, a failure when DRAFTWRIGHT_CORPUS_REQUIRED=1.
+    if corpus::dir().is_none() {
+        eprintln!(
+            "SKIPPED: explicit_dimensions_that_reflow_keep_their_reserved_corridors (the corpus is not found)"
+        );
+        return;
+    }
     let a = model::analyse_native(&corpus::dir().unwrap().join("nist/nist_ctc_01_asme1_rd.stp"))
         .unwrap()
         .1;
@@ -535,6 +549,13 @@ fn indirect_principal_relations_report_projection_infeasibility() {
 
 #[test]
 fn reserved_location_corridors_choose_witnesses_clear_of_foreign_holes() {
+    // Needs the sample corpus: skipped without it, a failure when DRAFTWRIGHT_CORPUS_REQUIRED=1.
+    if corpus::dir().is_none() {
+        eprintln!(
+            "SKIPPED: reserved_location_corridors_choose_witnesses_clear_of_foreign_holes (the corpus is not found)"
+        );
+        return;
+    }
     for (file, id, foreign) in [
         (
             "nist/nist_ftc_06_asme1_rd.stp",
@@ -593,6 +614,13 @@ fn reserved_location_corridors_choose_witnesses_clear_of_foreign_holes() {
 
 #[test]
 fn isometric_hidden_ink_obeys_visible_line_precedence() {
+    // Needs the sample corpus: skipped without it, a failure when DRAFTWRIGHT_CORPUS_REQUIRED=1.
+    if corpus::dir().is_none() {
+        eprintln!(
+            "SKIPPED: isometric_hidden_ink_obeys_visible_line_precedence (the corpus is not found)"
+        );
+        return;
+    }
     let (part, a) = model::analyse_native(
         &corpus::dir()
             .unwrap()

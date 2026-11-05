@@ -72,6 +72,15 @@ fn section() -> (model::Plan, api::Files) {
 
 #[test]
 fn remote_section_prints_both_planned_addresses() {
+    // Needs the sample corpus: skipped without it, a failure when DRAFTWRIGHT_CORPUS_REQUIRED=1.
+    if std::env::var_os("DRAFTWRIGHT_CORPUS").is_none()
+        && std::env::var_os("DRAFTWRIGHT_CORPUS_REQUIRED").is_none_or(|v| v != "1")
+    {
+        eprintln!(
+            "SKIPPED: remote_section_prints_both_planned_addresses (the corpus is not found)"
+        );
+        return;
+    }
     let (p, files) = section();
     let v = p.views.iter().find(|v| v.id == "v:section_aa").unwrap();
     let from = v.xref.as_ref().unwrap();
@@ -118,6 +127,15 @@ fn review_checks_structure_on_later_sheets() {
 
 #[test]
 fn missing_or_wrong_printed_reference_is_a_structural_error() {
+    // Needs the sample corpus: skipped without it, a failure when DRAFTWRIGHT_CORPUS_REQUIRED=1.
+    if std::env::var_os("DRAFTWRIGHT_CORPUS").is_none()
+        && std::env::var_os("DRAFTWRIGHT_CORPUS_REQUIRED").is_none_or(|v| v != "1")
+    {
+        eprintln!(
+            "SKIPPED: missing_or_wrong_printed_reference_is_a_structural_error (the corpus is not found)"
+        );
+        return;
+    }
     let path = PathBuf::from(std::env::var("DRAFTWRIGHT_CORPUS").unwrap())
         .join("nist/nist_ftc_06_asme1_rd.stp");
     let (part, analysis) = model::analyse_native(&path).unwrap();
@@ -166,6 +184,15 @@ fn missing_or_wrong_printed_reference_is_a_structural_error() {
 /// section whose caption crosses into the next zone. Copying the planned address is insufficient.
 #[test]
 fn small_part_remote_zones_match_drawn_view_and_cutting_letter() {
+    // Needs the sample corpus: skipped without it, a failure when DRAFTWRIGHT_CORPUS_REQUIRED=1.
+    if std::env::var_os("DRAFTWRIGHT_CORPUS").is_none()
+        && std::env::var_os("DRAFTWRIGHT_CORPUS_REQUIRED").is_none_or(|v| v != "1")
+    {
+        eprintln!(
+            "SKIPPED: small_part_remote_zones_match_drawn_view_and_cutting_letter (the corpus is not found)"
+        );
+        return;
+    }
     let root = PathBuf::from(std::env::var("DRAFTWRIGHT_CORPUS").unwrap());
     for name in ["10224", "10255"] {
         let (part, analysis) =
@@ -459,6 +486,15 @@ fn every_sheet_has_zones_and_centring_marks_by_default_and_none_when_off() {
 
 #[test]
 fn cited_zones_stay_when_switched_off_and_are_reported_once() {
+    // Needs the sample corpus: skipped without it, a failure when DRAFTWRIGHT_CORPUS_REQUIRED=1.
+    if std::env::var_os("DRAFTWRIGHT_CORPUS").is_none()
+        && std::env::var_os("DRAFTWRIGHT_CORPUS_REQUIRED").is_none_or(|v| v != "1")
+    {
+        eprintln!(
+            "SKIPPED: cited_zones_stay_when_switched_off_and_are_reported_once (the corpus is not found)"
+        );
+        return;
+    }
     let root = PathBuf::from(std::env::var("DRAFTWRIGHT_CORPUS").unwrap());
     let (part, analysis) = model::analyse_native(&root.join("mfcadpp/10224.step")).unwrap();
     let spec = serde_json::from_value(json!({"sheet":{"size":"A3","scale":"2:1","zones":false},"sheets":{"max":2},"views":{"iso":{"sheet":2},"section_aa":{"sheet":2}}})).unwrap();
@@ -483,6 +519,15 @@ fn cited_zones_stay_when_switched_off_and_are_reported_once() {
 /// (more than 2 mm) from a label on its line (#104).
 #[test]
 fn a_section_address_keeps_a_words_gap_from_a_label_on_its_line() {
+    // Needs the sample corpus: skipped without it, a failure when DRAFTWRIGHT_CORPUS_REQUIRED=1.
+    if std::env::var_os("DRAFTWRIGHT_CORPUS").is_none()
+        && std::env::var_os("DRAFTWRIGHT_CORPUS_REQUIRED").is_none_or(|v| v != "1")
+    {
+        eprintln!(
+            "SKIPPED: a_section_address_keeps_a_words_gap_from_a_label_on_its_line (the corpus is not found)"
+        );
+        return;
+    }
     let path = PathBuf::from(std::env::var("DRAFTWRIGHT_CORPUS").unwrap())
         .join("nist/nist_ftc_10_asme1_rb.stp");
     // #127's extra radii make the default one A1 sheet. Keep the two-sheet

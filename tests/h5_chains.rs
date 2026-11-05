@@ -48,6 +48,13 @@ fn marks(p: &Plan) -> Vec<Mark> {
 }
 #[test]
 fn grm03_has_an_overall_and_baseline_without_plate_thickness() {
+    // Needs the sample corpus: skipped without it, a failure when DRAFTWRIGHT_CORPUS_REQUIRED=1.
+    if corpus::dir().is_none() {
+        eprintln!(
+            "SKIPPED: grm03_has_an_overall_and_baseline_without_plate_thickness (the corpus is not found)"
+        );
+        return;
+    }
     let a = native("gramel/GRM-03_thumbwheel_drive_screw.step");
     // The small estimate withholds the full head; its 2 mm interval is determined
     // by the printed 0.5 and 2.5 stations. A roomy constrained sheet retains both
@@ -110,6 +117,11 @@ fn grm03_has_an_overall_and_baseline_without_plate_thickness() {
 }
 #[test]
 fn ctc05_states_its_od_and_across_flats_once() {
+    // Needs the sample corpus: skipped without it, a failure when DRAFTWRIGHT_CORPUS_REQUIRED=1.
+    if corpus::dir().is_none() {
+        eprintln!("SKIPPED: ctc05_states_its_od_and_across_flats_once (the corpus is not found)");
+        return;
+    }
     let a = native("nist/nist_ctc_05_asme1_rd.stp");
     let p = model::plan(&a, &Spec::default()).unwrap();
     assert!(
@@ -122,6 +134,13 @@ fn ctc05_states_its_od_and_across_flats_once() {
 }
 #[test]
 fn slot_chain_keeps_overall_and_functional_length_without_closure() {
+    // Needs the sample corpus: skipped without it, a failure when DRAFTWRIGHT_CORPUS_REQUIRED=1.
+    if corpus::dir().is_none() {
+        eprintln!(
+            "SKIPPED: slot_chain_keeps_overall_and_functional_length_without_closure (the corpus is not found)"
+        );
+        return;
+    }
     let a = native("mfcadpp/10047.step");
     let p = model::plan(&a, &references()).unwrap();
     assert!(
@@ -169,6 +188,13 @@ fn slot_chain_keeps_overall_and_functional_length_without_closure() {
 }
 #[test]
 fn concentric_bolt_circles_have_axis_location_credit() {
+    // Needs the sample corpus: skipped without it, a failure when DRAFTWRIGHT_CORPUS_REQUIRED=1.
+    if corpus::dir().is_none() {
+        eprintln!(
+            "SKIPPED: concentric_bolt_circles_have_axis_location_credit (the corpus is not found)"
+        );
+        return;
+    }
     let a = native("cadgenbench/flanged_spool_132.step");
     let p = model::plan(&a, &Spec::default()).unwrap();
     let issues = lint::check(&a, &marks(&p));
@@ -204,6 +230,13 @@ fn fully_dimensioned_box_is_clear() {
 }
 #[test]
 fn lint_detects_duplicate_claims_and_closed_turned_chains() {
+    // Needs the sample corpus: skipped without it, a failure when DRAFTWRIGHT_CORPUS_REQUIRED=1.
+    if corpus::dir().is_none() {
+        eprintln!(
+            "SKIPPED: lint_detects_duplicate_claims_and_closed_turned_chains (the corpus is not found)"
+        );
+        return;
+    }
     let a = chain_profile("gramel/GRM-03_thumbwheel_drive_screw.step");
     let p = model::plan(&a, &references()).unwrap();
     let mut ink = marks(&p);
@@ -235,6 +268,11 @@ fn lint_detects_duplicate_claims_and_closed_turned_chains() {
 }
 #[test]
 fn wall_witness_avoids_the_hole_centreline() {
+    // Needs the sample corpus: skipped without it, a failure when DRAFTWRIGHT_CORPUS_REQUIRED=1.
+    if corpus::dir().is_none() {
+        eprintln!("SKIPPED: wall_witness_avoids_the_hole_centreline (the corpus is not found)");
+        return;
+    }
     let a = native("nist/nist_ftc_07_asme1_rd.stp");
     let p = model::plan(&a, &Spec::default()).unwrap();
     let d = p
@@ -264,6 +302,13 @@ fn consolidated_flush_boss_height_is_not_reported_missing() {
 
 #[test]
 fn cross_view_locations_keep_single_claim_owners_and_controlling_labels() {
+    // Needs the sample corpus: skipped without it, a failure when DRAFTWRIGHT_CORPUS_REQUIRED=1.
+    if corpus::dir().is_none() {
+        eprintln!(
+            "SKIPPED: cross_view_locations_keep_single_claim_owners_and_controlling_labels (the corpus is not found)"
+        );
+        return;
+    }
     for file in [
         "nist/nist_ctc_02_asme1_rc.stp",
         "nist/nist_ftc_10_asme1_rb.stp",
@@ -289,6 +334,13 @@ fn cross_view_locations_keep_single_claim_owners_and_controlling_labels() {
 
 #[test]
 fn references_become_controlling_without_moving_other_ink() {
+    // Needs the sample corpus: skipped without it, a failure when DRAFTWRIGHT_CORPUS_REQUIRED=1.
+    if corpus::dir().is_none() {
+        eprintln!(
+            "SKIPPED: references_become_controlling_without_moving_other_ink (the corpus is not found)"
+        );
+        return;
+    }
     for (file, total) in [
         ("mfcadpp/10047.step", "d:envelope/height.length"),
         (
@@ -329,6 +381,13 @@ fn references_become_controlling_without_moving_other_ink() {
 
 #[test]
 fn a_pinned_reference_keeps_its_ink_and_reports_a_broken_controlling_chain() {
+    // Needs the sample corpus: skipped without it, a failure when DRAFTWRIGHT_CORPUS_REQUIRED=1.
+    if corpus::dir().is_none() {
+        eprintln!(
+            "SKIPPED: a_pinned_reference_keeps_its_ink_and_reports_a_broken_controlling_chain (the corpus is not found)"
+        );
+        return;
+    }
     let a = chain_profile("gramel/GRM-03_thumbwheel_drive_screw.step");
     // A pin holds the ink of the drawing it was taken from: the recovered one, as the pinned
     // plan below is recovered too. One sheet keeps the established frame: with free paper,
@@ -394,6 +453,13 @@ fn label(p: &Plan, id: &str) -> String {
 
 #[test]
 fn shoulders_on_slot_walls_are_references_when_the_slot_is_stated() {
+    // Needs the sample corpus: skipped without it, a failure when DRAFTWRIGHT_CORPUS_REQUIRED=1.
+    if corpus::dir().is_none() {
+        eprintln!(
+            "SKIPPED: shoulders_on_slot_walls_are_references_when_the_slot_is_stated (the corpus is not found)"
+        );
+        return;
+    }
     // 10047: 18.6 + 4.5 = 23.1, and the slot's centre 20.9 fixes both walls.
     let a = native("mfcadpp/10047.step");
     let p = model::plan(&a, &references()).unwrap();
@@ -440,6 +506,13 @@ fn shoulders_on_slot_walls_are_references_when_the_slot_is_stated() {
 
 #[test]
 fn lint_reports_the_10047_slot_wall_closure_when_every_member_is_stated() {
+    // Needs the sample corpus: skipped without it, a failure when DRAFTWRIGHT_CORPUS_REQUIRED=1.
+    if corpus::dir().is_none() {
+        eprintln!(
+            "SKIPPED: lint_reports_the_10047_slot_wall_closure_when_every_member_is_stated (the corpus is not found)"
+        );
+        return;
+    }
     let a = native("mfcadpp/10047.step");
     let p = model::plan(&a, &references()).unwrap();
     let mut ink = marks(&p);
@@ -461,6 +534,13 @@ fn lint_reports_the_10047_slot_wall_closure_when_every_member_is_stated() {
 
 #[test]
 fn a_plate_between_a_shoulder_and_the_box_is_not_stated_again() {
+    // Needs the sample corpus: skipped without it, a failure when DRAFTWRIGHT_CORPUS_REQUIRED=1.
+    if corpus::dir().is_none() {
+        eprintln!(
+            "SKIPPED: a_plate_between_a_shoulder_and_the_box_is_not_stated_again (the corpus is not found)"
+        );
+        return;
+    }
     // 10060: 33.6 - 19.3 = 14.3, the plate's thickness.
     let a = native("mfcadpp/10060.step");
     let p = model::plan(&a, &Spec::default()).unwrap();
@@ -485,6 +565,13 @@ fn a_plate_between_a_shoulder_and_the_box_is_not_stated_again() {
 
 #[test]
 fn lint_reports_an_overall_that_repeats_an_outside_diameter_or_across_flats() {
+    // Needs the sample corpus: skipped without it, a failure when DRAFTWRIGHT_CORPUS_REQUIRED=1.
+    if corpus::dir().is_none() {
+        eprintln!(
+            "SKIPPED: lint_reports_an_overall_that_repeats_an_outside_diameter_or_across_flats (the corpus is not found)"
+        );
+        return;
+    }
     // CTC-05 before this stream: linear 558.8 beside ø558.8, 527.0 beside 527.05 A/F.
     let a = native("nist/nist_ctc_05_asme1_rd.stp");
     let p = model::plan(&a, &Spec::default()).unwrap();
@@ -659,6 +746,13 @@ fn references_sheet_option_validates_and_round_trips() {
 
 #[test]
 fn automatic_references_are_covered_without_losing_controlling_dimensions() {
+    // Needs the sample corpus: skipped without it, a failure when DRAFTWRIGHT_CORPUS_REQUIRED=1.
+    if corpus::dir().is_none() {
+        eprintln!(
+            "SKIPPED: automatic_references_are_covered_without_losing_controlling_dimensions (the corpus is not found)"
+        );
+        return;
+    }
     let boss = model::analyse_native(
         &std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("tests/fixtures/parts/boss_circle.step"),

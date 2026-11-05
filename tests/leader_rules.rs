@@ -606,6 +606,13 @@ fn claims(d: &Drawing, parameter: &str) -> usize {
 /// material` is the case where both report one).
 #[test]
 fn the_ports_own_callouts_touch_their_targets() {
+    // Needs the sample corpus: skipped without it, a failure when DRAFTWRIGHT_CORPUS_REQUIRED=1.
+    if std::env::var_os("DRAFTWRIGHT_CORPUS").is_none()
+        && std::env::var_os("DRAFTWRIGHT_CORPUS_REQUIRED").is_none_or(|v| v != "1")
+    {
+        eprintln!("SKIPPED: the_ports_own_callouts_touch_their_targets (the corpus is not found)");
+        return;
+    }
     let (mut holes, mut blends) = (0, 0);
     for (name, a, plan, drawing) in drawings() {
         let issues = lint::lint(&a, &drawing);

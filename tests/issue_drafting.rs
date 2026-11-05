@@ -199,6 +199,11 @@ fn printed(label: &str) -> Vec<String> {
 /// carries the plan's claims and prints the complete label in ordered, wrapped text runs.
 #[test]
 fn a_hole_callout_claims_everything_it_prints() {
+    // Needs the sample corpus: skipped without it, a failure when DRAFTWRIGHT_CORPUS_REQUIRED=1.
+    if corpus::dir().is_none() {
+        eprintln!("SKIPPED: a_hole_callout_claims_everything_it_prints (the corpus is not found)");
+        return;
+    }
     let mut seen = 0;
     for (name, _, plan) in planned() {
         for d in plan.dimensions.iter().filter(|d| hole_callout(d)) {
@@ -544,6 +549,13 @@ fn a_sheet_the_spec_names_is_never_escalated() {
 /// profiles included, is `tests/leader_rules.rs` (stream K4).
 #[test]
 fn a_hole_callouts_tip_is_on_the_rim_of_a_hole_it_names() {
+    // Needs the sample corpus: skipped without it, a failure when DRAFTWRIGHT_CORPUS_REQUIRED=1.
+    if corpus::dir().is_none() {
+        eprintln!(
+            "SKIPPED: a_hole_callouts_tip_is_on_the_rim_of_a_hole_it_names (the corpus is not found)"
+        );
+        return;
+    }
     let mut seen = 0;
     for (name, analysis, plan) in planned() {
         let read: BTreeMap<&str, holes::Hole> = holes::read(analysis)
@@ -773,6 +785,11 @@ fn a_rear_view_is_never_added_and_one_asked_for_is_refused() {
 /// asked for), and the tangent, gap and coplanar-boundary cases have no fixture here.
 #[test]
 fn a_sections_ink_describes_its_cut() {
+    // Needs the sample corpus: skipped without it, a failure when DRAFTWRIGHT_CORPUS_REQUIRED=1.
+    if corpus::dir().is_none() {
+        eprintln!("SKIPPED: a_sections_ink_describes_its_cut (the corpus is not found)");
+        return;
+    }
     let mut seen = 0;
     for (name, analysis, plan) in planned() {
         let Some(v) = plan.views.iter().find(|v| v.cut.is_some()) else {
@@ -1392,6 +1409,13 @@ fn a_toleranced_label_grows_along_its_line_and_its_box_holds_it() {
 /// none).
 #[test]
 fn every_authored_tolerance_reaches_the_label_that_claims_it() {
+    // Needs the sample corpus: skipped without it, a failure when DRAFTWRIGHT_CORPUS_REQUIRED=1.
+    if corpus::dir().is_none() {
+        eprintln!(
+            "SKIPPED: every_authored_tolerance_reaches_the_label_that_claims_it (the corpus is not found)"
+        );
+        return;
+    }
     let mut seen = 0;
     for (name, analysis, plan) in planned() {
         let ids: Vec<&str> = plan

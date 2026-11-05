@@ -42,7 +42,12 @@ pub fn wanted(analysis: &Analysis) -> Vec<Wanted<'_>> {
             })();
             let (values, callout) = match sizes {
                 Ok((leg, other, angle)) if equal_45(leg, other, angle) => {
-                    (Ok(vec![leg]), format!("C{}", fmt(leg)))
+                    let callout = if crate::standard::asme() {
+                        format!("{} X 45°", fmt(leg))
+                    } else {
+                        format!("C{}", fmt(leg))
+                    };
+                    (Ok(vec![leg]), callout)
                 }
                 Ok((leg, _, angle)) => (
                     Ok(vec![leg, angle]),

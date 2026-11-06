@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>draftwright</title>
+<style>
+  :root {
+    --ink: #1c2430; --muted: #5d6878; --line: #d7dde5; --paper: #f6f7f9; --card: #fff;
+    --accent: #1f4fd1; --accent-soft: #e8eefc; --ok: #1b7f4c; --bad: #b42318; --warn: #9a6400;
+    font-family: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--paper); color: var(--ink); }
+  header { background: var(--ink); color: #fff; padding: 14px 20px; display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+  header h1 { margin: 0; font-size: 18px; font-weight: 600; letter-spacing: .02em; }
+  header span { color: #b8c2d0; font-size: 13px; }
+  main { max-width: 920px; margin: 0 auto; padding: 20px 16px 60px; }
+  .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin-bottom: 18px; }
+  .tabs button { border: 0; background: none; padding: 10px 14px; font: inherit; color: var(--muted); cursor: pointer; border-bottom: 2px solid transparent; }
+  .tabs button.on { color: var(--ink); border-bottom-color: var(--accent); font-weight: 600; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 18px; margin-bottom: 16px; }
+  label.field { display: block; font-size: 13px; color: var(--muted); margin: 12px 0 4px; }
+  input[type=text] { width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; font: inherit; }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .seg button { border: 0; padding: 9px 18px; font: inherit; background: #fff; cursor: pointer; color: var(--muted); }
+  .seg button.on { background: var(--accent); color: #fff; font-weight: 600; }
+  .seg-note { font-size: 13px; color: var(--muted); margin-top: 6px; }
+  .drop { border: 2px dashed var(--line); border-radius: 8px; padding: 18px; text-align: center; color: var(--muted); cursor: pointer; }
+  .drop.has { border-style: solid; border-color: var(--accent); background: var(--accent-soft); color: var(--ink); }
+  .row { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 0 14px; }
+  .check { display: flex; align-items: center; gap: 8px; margin-top: 12px; font-size: 14px; }
+  .primary { margin-top: 16px; background: var(--accent); color: #fff; border: 0; border-radius: 6px; padding: 10px 18px; font: inherit; font-weight: 600; cursor: pointer; }
+  .primary:disabled { opacity: .5; cursor: default; }
+  .steps { list-style: none; padding: 0; margin: 8px 0 0; font-size: 14px; }
+  .steps li { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; border-bottom: 1px solid var(--line); }
+  .state-done { color: var(--ok); } .state-failed { color: var(--bad); } .state-running { color: var(--warn); } .state-queued { color: var(--muted); }
+  .files { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+  .files a { font-size: 13px; padding: 5px 9px; border: 1px solid var(--line); border-radius: 5px; color: var(--accent); text-decoration: none; background: #fff; }
+  .thumbs { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; margin-top: 12px; }
+  .thumbs figure { margin: 0; border: 1px solid var(--line); border-radius: 6px; background: #fff; overflow: hidden; }
+  .thumbs img { width: 100%; display: block; }
+  .thumbs figcaption { font-size: 12px; padding: 6px 8px; color: var(--muted); }
+  pre.punch { white-space: pre-wrap; font-size: 12.5px; background: var(--paper); border: 1px solid var(--line); border-radius: 6px; padding: 12px; max-height: 480px; overflow: auto; }
+  .err { color: var(--bad); font-size: 14px; margin-top: 10px; }
+  footer { font-size: 12px; color: var(--muted); text-align: center; margin-top: 24px; }
+  footer a { color: var(--muted); }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/htm@3.1.1/dist/htm.umd.js"></script>
+<script>
+const { useState, useEffect, useRef } = React;
+const html = htm.bind(React.createElement);
+
+function Standard({ value, onChange }) {
+  return html`<div>
+    <div class="seg" role="group" aria-label="Drawing standard">
+      <button class=${value === "asme" ? "on" : ""} onClick=${() => onChange("asme")}>ASME (inches)</button>
+      <button class=${value === "iso" ? "on" : ""} onClick=${() => onChange("iso")}>ISO (mm)</button>
+    </div>
+    <div class="seg-note">${value === "asme"
+      ? "ASME Y14.5: inches to three places, ANSI A to E paper, third-angle, Unified threads."
+      : "ISO: millimetres, A4 to A0 paper, ISO 7200 title block, metric threads."}</div>
+  </div>`;
+}
+
+function Drop({ label, accept, multiple, files, onFiles }) {
+  const input = useRef();
+  const names = files.map(f => f.name);
+  return html`<div class=${"drop" + (files.length ? " has" : "")}
+      onClick=${() => input.current.click()}
+      onDragOver=${e => e.preventDefault()}
+      onDrop=${e => { e.preventDefault(); onFiles([...e.dataTransfer.files]); }}>
+    <input ref=${input} type="file" accept=${accept} multiple=${multiple} hidden
+      onChange=${e => onFiles([...e.target.files])} />
+    ${files.length ? (names.length > 4 ? `${names.length} files: ${names.slice(0, 3).join(", ")}, …` : names.join(", "))
+      : label}
+  </div>`;
+}
+
+function useJob() {
+  const [job, setJob] = useState(null);
+  const [error, setError] = useState("");
+  const timer = useRef();
+  const poll = id => {
+    clearTimeout(timer.current);
+    fetch(`api/jobs/${id}`).then(r => r.json()).then(j => {
+      if (j.error && !j.id) { setError(j.error); return; }
+      setJob(j);
+      if (j.state === "queued" || j.state === "running") timer.current = setTimeout(() => poll(id), 2000);
+    }).catch(e => setError(String(e)));
+  };
+  const start = async (url, form) => {
+    setError(""); setJob(null);
+    try {
+      const r = await fetch(url, { method: "POST", body: form });
+      const j = await r.json();
+      if (!r.ok) { setError(j.error || `HTTP ${r.status}`); return; }
+      poll(j.id);
+    } catch (e) { setError(String(e)); }
+  };
+  useEffect(() => () => clearTimeout(timer.current), []);
+  return { job, error, start };
+}
+
+function JobView({ job }) {
+  if (!job) return null;
+  const busy = job.state === "queued" || job.state === "running";
+  const pngs = job.files.filter(f => f.endsWith(".png"));
+  const others = job.files.filter(f => !f.endsWith(".png"));
+  return html`<div class="card">
+    <strong>${busy ? (job.ahead ? `Waiting: ${job.ahead} job(s) ahead` : "Working… about 45 s per part") : job.summary || job.state}</strong>
+    ${job.error && html`<div class="err">${job.error}</div>`}
+    <ul class="steps">${job.steps.map(s => html`<li key=${s.name}>
+      <span>${s.name}</span><span class=${"state-" + s.state}>${s.state}${s.detail ? `: ${s.detail}` : ""}</span></li>`)}</ul>
+    ${job.files.length > 0 && html`<div class="files">
+      <a href=${`api/jobs/${job.id}/zip`}>Download all (.zip)</a>
+      ${others.map(f => html`<a key=${f} href=${`api/jobs/${job.id}/files/${encodeURIComponent(f)}`} target="_blank">${f}</a>`)}
+    </div>`}
+    ${pngs.length > 0 && html`<div class="thumbs">${pngs.map(f => html`<figure key=${f}>
+      <a href=${`api/jobs/${job.id}/files/${encodeURIComponent(f.replace(/\.png$/, ".pdf"))}`} target="_blank">
+        <img src=${`api/jobs/${job.id}/files/${encodeURIComponent(f)}`} alt=${f} /></a>
+      <figcaption>${f.replace(/\.png$/, "")}</figcaption></figure>`)}</div>`}
+    ${job.punch_list && html`<h3>Punch list</h3><pre class="punch">${job.punch_list}</pre>`}
+  </div>`;
+}
+
+function Make() {
+  const [standard, setStandard] = useState("asme");
+  const [steps, setSteps] = useState([]);
+  const [dual, setDual] = useState(false);
+  const [gov, setGov] = useState(false);
+  const [fields, setFields] = useState({ cage: "", revision: "", drawn_by: "", company: "" });
+  const { job, error, start } = useJob();
+  const busy = job && (job.state === "queued" || job.state === "running");
+  const go = () => {
+    const form = new FormData();
+    steps.forEach(f => form.append("steps", f));
+    form.append("standard", standard);
+    form.append("dual", dual && standard === "asme");
+    form.append("gov", gov && standard === "asme");
+    Object.entries(fields).forEach(([k, v]) => form.append(k, v));
+    start("api/render", form);
+  };
+  const field = (key, label) => html`<div><label class="field">${label}</label>
+    <input type="text" value=${fields[key]} onInput=${e => setFields({ ...fields, [key]: e.target.value })} /></div>`;
+  return html`<div>
+    <div class="card">
+      <${Standard} value=${standard} onChange=${setStandard} />
+      <label class="field">STEP files (one drawing each; name them by drawing number, e.g. SRT-100-116_holder.step)</label>
+      <${Drop} label="Drop STEP files here, or click to choose" accept=".step,.stp" multiple=${true} files=${steps} onFiles=${setSteps} />
+      ${standard === "asme" && html`<div>
+        <label class="check"><input type="checkbox" checked=${dual} onChange=${e => setDual(e.target.checked)} /> Dual dimensions (.250 [6.35])</label>
+        <label class="check"><input type="checkbox" checked=${gov} onChange=${e => setGov(e.target.checked)} /> Revision block and distribution statement</label>
+      </div>`}
+      <div class="row">
+        ${field("revision", "Revision")}
+        ${field("drawn_by", "Drawn by")}
+        ${field("company", "Company")}
+        ${standard === "asme" ? field("cage", "CAGE code") : null}
+      </div>
+      <button class="primary" disabled=${!steps.length || busy} onClick=${go}>Make ${standard.toUpperCase()} drawings</button>
+      ${error && html`<div class="err">${error}</div>`}
+    </div>
+    <${JobView} job=${job} />
+  </div>`;
+}
+
+function Check() {
+  const [standard, setStandard] = useState("asme");
+  const [steps, setSteps] = useState([]);
+  const [drawing, setDrawing] = useState([]);
+  const { job, error, start } = useJob();
+  const busy = job && (job.state === "queued" || job.state === "running");
+  const go = () => {
+    const form = new FormData();
+    steps.forEach(f => form.append("steps", f));
+    form.append("drawing", drawing[0]);
+    form.append("standard", standard);
+    start("api/check", form);
+  };
+  return html`<div>
+    <div class="card">
+      <${Standard} value=${standard} onChange=${setStandard} />
+      <label class="field">The parts (STEP files named by drawing number)</label>
+      <${Drop} label="Drop STEP files here, or click to choose" accept=".step,.stp" multiple=${true} files=${steps} onFiles=${setSteps} />
+      <label class="field">The drawing set (one PDF, any CAD program)</label>
+      <${Drop} label="Drop the drawing PDF here, or click to choose" accept=".pdf" multiple=${false} files=${drawing} onFiles=${f => setDrawing(f.slice(0, 1))} />
+      <button class="primary" disabled=${!steps.length || !drawing.length || busy} onClick=${go}>Check the drawings</button>
+      ${error && html`<div class="err">${error}</div>`}
+    </div>
+    <${JobView} job=${job} />
+  </div>`;
+}
+
+function App() {
+  const [tab, setTab] = useState("make");
+  const [info, setInfo] = useState(null);
+  useEffect(() => { fetch("api/info").then(r => r.json()).then(setInfo).catch(() => {}); }, []);
+  return html`<div>
+    <header><h1>draftwright</h1><span>Engineering drawings from STEP, to ASME or ISO</span></header>
+    <main>
+      <div class="tabs">
+        <button class=${tab === "make" ? "on" : ""} onClick=${() => setTab("make")}>Make drawings</button>
+        <button class=${tab === "check" ? "on" : ""} onClick=${() => setTab("check")}>Check a drawing set</button>
+      </div>
+      ${tab === "make" ? html`<${Make} />` : html`<${Check} />`}
+      <footer>${info ? info.version : ""} · AGPL-3.0 · <a href=${info ? info.source : "#"}>source</a></footer>
+    </main>
+  </div>`;
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(html`<${App} />`);
+</script>
+</body>
+</html>

@@ -238,12 +238,26 @@ pub struct Finding {
     /// (on a located feature's centreline).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub how: Option<String>,
+    /// `note` when the number is printed only in a note (prose such as a notes block or modelling
+    /// instructions), not in a view: stated, but worth a look.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub place: Option<&'static str>,
 }
 
 /// Each size and location of *items* against *text*. Locations at the part's edge (zero from
 /// the minimum or maximum) are skipped: an edge needs no dimension.
-pub fn check(analysis: &Analysis, items: &[Item], text: &str, unit: Unit) -> Vec<Finding> {
-    let printed = tokens(text);
+pub fn check(analysis: &Analysis, items: &[Item], drawing: &Drawing, unit: Unit) -> Vec<Finding> {
+    let view = tokens(&drawing.view);
+    let printed: std::collections::BTreeSet<String> =
+        view.union(&tokens(&drawing.notes)).cloned().collect();
+    // `note` when none of *values* is printed in a view (so the match came from a note).
+    let place = |values: &[f64], exact: bool| {
+        let in_view = values.iter().any(|v| {
+            let s = if exact { exact_spellings(*v) } else { spellings(*v) };
+            s.iter().any(|s| view.contains(s))
+        });
+        (!in_view).then_some("note")
+    };
     let states = |v: f64| spellings(v).iter().any(|s| printed.contains(s));
     // A location's number must be what the value prints as: three or four places, or fewer only
     // when the value is exact at them (`2.15` for 2.150, never `.3` for .297). Loose matching
@@ -256,10 +270,14 @@ pub fn check(analysis: &Analysis, items: &[Item], text: &str, unit: Unit) -> Vec
     let mut fixed: Vec<(usize, f64, String)> = Vec::new();
     for item in items {
         for (name, v) in &item.sizes {
-            let found = states(*v)
-                || (name.starts_with("half_") && states(v * 2.0))
-                || (name == "diameter" && states(v / 2.0))
-                || (name == "radius" && states(v * 2.0));
+            let mut values = vec![*v];
+            if name.starts_with("half_") || name == "radius" {
+                values.push(v * 2.0);
+            }
+            if name == "diameter" {
+                values.push(v / 2.0);
+            }
+            let found = values.iter().any(|v| states(*v));
             out.push(Finding {
                 feature: item.id.clone(),
                 kind: item.kind.clone(),
@@ -267,6 +285,7 @@ pub fn check(analysis: &Analysis, items: &[Item], text: &str, unit: Unit) -> Vec
                 value: *v,
                 found,
                 how: None,
+                place: if found { place(&values, false) } else { None },
             });
         }
         if let Some(at) = item
@@ -288,6 +307,7 @@ pub fn check(analysis: &Analysis, items: &[Item], text: &str, unit: Unit) -> Vec
                         value: round(2.0 * r),
                         found: true,
                         how: None,
+                        place: place(&[2.0 * r, r], true),
                     });
                     for k in (0..3).filter(|&k| ax[k].abs() <= 0.9) {
                         fixed.push((k, at[k], item.id.clone()));
@@ -321,6 +341,7 @@ pub fn check(analysis: &Analysis, items: &[Item], text: &str, unit: Unit) -> Vec
                     ),
                     found: true,
                     how: Some("radial: placed by its angle about the part's centre".into()),
+                    place: None,
                 });
             }
             for k in 0..3 {
@@ -333,7 +354,8 @@ pub fn check(analysis: &Analysis, items: &[Item], text: &str, unit: Unit) -> Vec
                     fixed.push((k, a, item.id.clone()));
                     continue;
                 }
-                let found = exact(a) || exact(b) || exact((a - span[k] / 2.0).abs());
+                let values = [a, b, (a - span[k] / 2.0).abs()];
+                let found = values.iter().any(|v| exact(*v));
                 out.push(Finding {
                     feature: item.id.clone(),
                     kind: item.kind.clone(),
@@ -341,6 +363,7 @@ pub fn check(analysis: &Analysis, items: &[Item], text: &str, unit: Unit) -> Vec
                     value: a,
                     found,
                     how: None,
+                    place: if found { place(&values, true) } else { None },
                 });
             }
         }
@@ -522,9 +545,9 @@ pub fn report(analysis: &Analysis, unit: Unit) -> Value {
 }
 
 /// The `check` command's result: the numbers *text* does not state, and a tally.
-pub fn check_report(analysis: &Analysis, text: &str, unit: Unit) -> Value {
+pub fn check_report(analysis: &Analysis, drawing: &Drawing, unit: Unit) -> Value {
     let items = items(analysis, unit);
-    let findings = check(analysis, &items, text, unit);
+    let findings = check(analysis, &items, drawing, unit);
     let missing: Vec<&Finding> = findings.iter().filter(|f| !f.found).collect();
     let sizes = |found: bool| {
         findings
@@ -542,21 +565,265 @@ pub fn check_report(analysis: &Analysis, text: &str, unit: Unit) -> Value {
         "units": unit.name(),
         "sizes": { "checked": sizes(true), "not_stated": sizes(false) },
         "locations": { "checked": locations(true), "not_stated": locations(false) },
-        "note": "Locations are found from an edge, the centre, a bolt circle, a chain from another located feature, or a shared centreline. What is left is not stated by any of those; check it by eye.",
+        "note": "Locations are found from an edge, the centre, a bolt circle, a chain from another located feature, or a shared centreline. What is left is not stated by any of those; check it by eye. The title block and the zone border do not count; only_in_notes lists numbers stated in a note (prose) but in no view.",
+        "read_layout": drawing.layout,
         "not_stated": missing,
+        "only_in_notes": findings.iter().filter(|f| f.place == Some("note")).collect::<Vec<_>>(),
         "located_through": findings.iter().filter(|f| f.how.is_some()).collect::<Vec<_>>(),
     })
 }
 
-/// A drawing set's pages' text: a PDF's pages through `pdftotext -layout` (which ends each page
-/// with a form feed), or a text file's form-feed-separated pages.
-pub fn drawing_pages(path: &std::path::Path) -> Result<Vec<String>, String> {
-    let text = drawing_text(path)?;
-    let mut pages: Vec<String> = text.split('\u{c}').map(String::from).collect();
-    while pages.last().is_some_and(|p| p.trim().is_empty()) {
-        pages.pop();
+/// A drawing's printed text, split by where it sits. From a PDF, words in the title block and
+/// the zone border are left out, and prose lines (a notes block, modelling instructions) are kept
+/// apart from the views ([`layout`]); from a text file, everything counts as a view.
+#[derive(Clone, Debug, Default)]
+pub struct Drawing {
+    /// Text in the views: dimensions and callouts.
+    pub view: String,
+    /// Prose lines: notes.
+    pub notes: String,
+    /// Whether the text was split by its layout (a PDF), or taken whole (a text file).
+    pub layout: bool,
+}
+
+impl Drawing {
+    /// A text taken whole, as a view.
+    pub fn text(text: &str) -> Drawing {
+        Drawing {
+            view: text.to_string(),
+            ..Drawing::default()
+        }
     }
-    Ok(pages)
+    /// Several pages read as one drawing.
+    pub fn join<'a>(pages: impl IntoIterator<Item = &'a Drawing>) -> Drawing {
+        let mut out = Drawing {
+            layout: true,
+            ..Drawing::default()
+        };
+        for d in pages {
+            out.view += &d.view;
+            out.view.push('\n');
+            out.notes += &d.notes;
+            out.notes.push('\n');
+            out.layout &= d.layout;
+        }
+        out
+    }
+}
+
+/// One page of a drawing set: its text in reading order (to find its drawing number) and its
+/// text by place.
+#[derive(Clone, Debug)]
+pub struct Page {
+    pub text: String,
+    pub drawing: Drawing,
+}
+
+/// A drawing set's pages: a PDF's through `pdftotext` (with each word's position, for
+/// [`layout`]), or a text file's form-feed-separated pages.
+pub fn drawing_pages(path: &std::path::Path) -> Result<Vec<Page>, String> {
+    let text = drawing_text(path)?;
+    let mut texts: Vec<String> = text.split('\u{c}').map(String::from).collect();
+    while texts.last().is_some_and(|p| p.trim().is_empty()) {
+        texts.pop();
+    }
+    let placed = if is_pdf(path) {
+        Some(pdf_words(path)?)
+    } else {
+        None
+    };
+    Ok(texts
+        .into_iter()
+        .enumerate()
+        .map(|(i, text)| {
+            let drawing = match placed.as_ref().and_then(|p| p.get(i)) {
+                Some(page) => layout(page),
+                None => Drawing::text(&text),
+            };
+            Page { text, drawing }
+        })
+        .collect())
+}
+
+/// A whole drawing, its pages joined.
+pub fn drawing(path: &std::path::Path) -> Result<Drawing, String> {
+    let pages = drawing_pages(path)?;
+    Ok(Drawing::join(pages.iter().map(|p| &p.drawing)))
+}
+
+fn is_pdf(path: &std::path::Path) -> bool {
+    path.extension()
+        .is_some_and(|e| e.eq_ignore_ascii_case("pdf"))
+}
+
+/// A printed word and its box, in points from the page's top left.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Word {
+    pub text: String,
+    pub x0: f64,
+    pub y0: f64,
+    pub x1: f64,
+    pub y1: f64,
+}
+
+/// A page's size and words.
+#[derive(Clone, Debug, Default)]
+pub struct PageWords {
+    pub width: f64,
+    pub height: f64,
+    pub words: Vec<Word>,
+}
+
+/// Every page's words, through `pdftotext -bbox`.
+fn pdf_words(path: &std::path::Path) -> Result<Vec<PageWords>, String> {
+    let out = std::process::Command::new("pdftotext")
+        .arg("-bbox")
+        .arg(path)
+        .arg("-")
+        .output()
+        .map_err(|e| format!("reading a PDF needs pdftotext (poppler-utils) installed ({e})"))?;
+    if !out.status.success() {
+        return Err(format!(
+            "pdftotext could not read {}: {}",
+            path.display(),
+            String::from_utf8_lossy(&out.stderr)
+        ));
+    }
+    Ok(parse_bbox(&String::from_utf8_lossy(&out.stdout)))
+}
+
+/// `pdftotext -bbox`'s XHTML: `<page width= height=>` and `<word xMin= yMin= xMax= yMax=>text`.
+pub fn parse_bbox(xhtml: &str) -> Vec<PageWords> {
+    let attr = |tag: &str, name: &str| -> f64 {
+        let key = format!("{name}=\"");
+        tag.find(&key)
+            .and_then(|i| {
+                let rest = &tag[i + key.len()..];
+                rest[..rest.find('"')?].parse().ok()
+            })
+            .unwrap_or(0.0)
+    };
+    let unescape = |t: &str| {
+        t.replace("&lt;", "<")
+            .replace("&gt;", ">")
+            .replace("&quot;", "\"")
+            .replace("&apos;", "'")
+            .replace("&amp;", "&")
+    };
+    let mut pages = Vec::new();
+    for line in xhtml.lines() {
+        let line = line.trim();
+        if line.starts_with("<page ") {
+            pages.push(PageWords {
+                width: attr(line, "width"),
+                height: attr(line, "height"),
+                words: Vec::new(),
+            });
+        } else if line.starts_with("<word ") {
+            let (Some(open), Some(close)) = (line.find('>'), line.rfind("</word>")) else {
+                continue;
+            };
+            let Some(page) = pages.last_mut() else {
+                continue;
+            };
+            let tag = &line[..open];
+            page.words.push(Word {
+                text: unescape(&line[open + 1..close]),
+                x0: attr(tag, "xMin"),
+                y0: attr(tag, "yMin"),
+                x1: attr(tag, "xMax"),
+                y1: attr(tag, "yMax"),
+            });
+        }
+    }
+    pages
+}
+
+/// Labels a title block carries; three of them low and to the right mark it.
+const TITLE_LABELS: [&str; 16] = [
+    "DWG", "SCALE", "SHEET", "REV", "TOLERANCES", "UNLESS", "DRAWN", "CHECKED", "MATERIAL",
+    "FINISH", "TITLE", "SIZE", "APPROVED", "DATE", "WEIGHT", "CAGE",
+];
+
+/// A page's words split into views and notes. Left out: the zone border (words within 22 pt of
+/// the sheet's edge) and the title block (the region right of and below its labels). A run of
+/// words on one line is a note when it reads as prose: two or more words with lower-case letters
+/// (drawing callouts are capitals), or six or more words mostly of letters.
+pub fn layout(page: &PageWords) -> Drawing {
+    let (w, h) = (page.width.max(1.0), page.height.max(1.0));
+    let border = |word: &Word| {
+        word.x0 < 22.0 || word.y0 < 22.0 || word.x1 > w - 22.0 || word.y1 > h - 22.0
+    };
+    let label = |word: &Word| {
+        let t: String = word
+            .text
+            .chars()
+            .filter(|c| c.is_ascii_alphabetic())
+            .collect::<String>()
+            .to_ascii_uppercase();
+        TITLE_LABELS.contains(&t.as_str())
+    };
+    let labels: Vec<&Word> = page
+        .words
+        .iter()
+        .filter(|word| {
+            label(word) && word.y0 > h * 0.7 && word.x0 > w * 0.4 && !border(word)
+        })
+        .collect();
+    let title = (labels.len() >= 3).then(|| {
+        (
+            labels.iter().map(|l| l.x0).fold(f64::MAX, f64::min) - 6.0,
+            labels.iter().map(|l| l.y0).fold(f64::MAX, f64::min) - 6.0,
+        )
+    });
+    let in_title = |word: &Word| title.is_some_and(|(x, y)| word.x0 >= x && word.y0 >= y);
+    let mut kept: Vec<&Word> = page
+        .words
+        .iter()
+        .filter(|word| !border(word) && !in_title(word))
+        .collect();
+    kept.sort_by(|a, b| {
+        (a.y0.round(), a.x0)
+            .partial_cmp(&(b.y0.round(), b.x0))
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+    // Runs: words on one baseline, each starting within a few characters of the last's end.
+    let mut runs: Vec<Vec<&Word>> = Vec::new();
+    for word in kept {
+        let height = (word.y1 - word.y0).max(1.0);
+        match runs.last_mut() {
+            Some(run)
+                if run.last().is_some_and(|last| {
+                    (last.y0 - word.y0).abs() < height * 0.4
+                        && word.x0 >= last.x0
+                        && word.x0 - last.x1 < height * 1.5
+                }) =>
+            {
+                run.push(word)
+            }
+            _ => runs.push(vec![word]),
+        }
+    }
+    let mut out = Drawing {
+        layout: true,
+        ..Drawing::default()
+    };
+    for run in runs {
+        let lower = run
+            .iter()
+            .filter(|w| w.text.chars().any(|c| c.is_lowercase()))
+            .count();
+        let letters = run
+            .iter()
+            .filter(|w| w.text.chars().filter(|c| c.is_alphabetic()).count() >= 2)
+            .count();
+        let prose = lower >= 2 || (run.len() >= 6 && letters * 10 >= run.len() * 6);
+        let text = run.iter().map(|w| w.text.as_str()).collect::<Vec<_>>().join(" ");
+        let into = if prose { &mut out.notes } else { &mut out.view };
+        into.push_str(&text);
+        into.push('\n');
+    }
+    out
 }
 
 /// The drawing number a STEP file's name gives: its stem up to the first `_` or space
@@ -654,10 +921,7 @@ pub fn match_pages(numbers: &[String], pages: &[String]) -> Vec<Option<Pages>> {
 
 /// The text of a drawing: a text file as it is, a PDF through `pdftotext -layout`.
 pub fn drawing_text(path: &std::path::Path) -> Result<String, String> {
-    let pdf = path
-        .extension()
-        .is_some_and(|e| e.eq_ignore_ascii_case("pdf"));
-    if !pdf {
+    if !is_pdf(path) {
         return std::fs::read_to_string(path)
             .map_err(|e| format!("cannot read {}: {e}", path.display()));
     }
@@ -723,6 +987,68 @@ mod tests {
             drawing_number(std::path::Path::new("x/SRT-100-118_pressure_finger.step")),
             "SRT-100-118"
         );
+    }
+
+    fn word(text: &str, x: f64, y: f64) -> Word {
+        Word {
+            text: text.into(),
+            x0: x,
+            y0: y,
+            x1: x + 6.0 * text.chars().count() as f64,
+            y1: y + 8.0,
+        }
+    }
+
+    /// The title block and the zone border are left out, a callout stays in the views, and prose
+    /// (lower case, or a long run of words) goes to the notes.
+    #[test]
+    fn layout_splits_views_notes_and_title_block() {
+        let mut words = vec![word("8", 99.0, 10.0), word("D", 5.0, 115.0)];
+        // A run of words on one line, 4 pt apart.
+        let run = |words: &mut Vec<Word>, texts: &[&str], mut x: f64, y: f64| {
+            for t in texts {
+                let w = word(t, x, y);
+                x = w.x1 + 4.0;
+                words.push(w);
+            }
+        };
+        run(&mut words, &["5X", "Ø.100", "X", ".10", "DEEP"], 300.0, 120.0);
+        run(&mut words, &["Ø.400", "x", ".070", "terminal", "boss"], 820.0, 260.0);
+        for (t, x, y) in [
+            ("UNLESS", 724.0, 633.0),
+            ("TOLERANCES:", 724.0, 663.0),
+            ("±.005", 786.0, 678.0),
+            ("DWG", 906.0, 703.0),
+            ("SCALE", 906.0, 734.0),
+            ("2:1", 908.0, 750.0),
+        ] {
+            words.push(word(t, x, y));
+        }
+        let d = layout(&PageWords {
+            width: 1224.0,
+            height: 792.0,
+            words,
+        });
+        assert!(d.layout);
+        assert_eq!(d.view.trim(), "5X Ø.100 X .10 DEEP");
+        assert_eq!(d.notes.trim(), "Ø.400 x .070 terminal boss");
+    }
+
+    #[test]
+    fn bbox_output_is_read_by_page() {
+        let xhtml = r#"<doc>
+  <page width="612.000000" height="792.000000">
+    <word xMin="10.0" yMin="20.0" xMax="30.0" yMax="28.0">&#216;.250</word>
+    <word xMin="40.0" yMin="20.0" xMax="60.0" yMax="28.0">A&amp;B</word>
+  </page>
+  <page width="612.000000" height="792.000000">
+  </page>
+</doc>"#;
+        let pages = parse_bbox(xhtml);
+        assert_eq!(pages.len(), 2);
+        assert_eq!(pages[0].words[1].text, "A&B");
+        assert_eq!(pages[0].words[0].x1, 30.0);
+        assert!(pages[1].words.is_empty());
     }
 
     #[test]

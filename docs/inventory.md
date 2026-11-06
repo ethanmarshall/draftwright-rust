@@ -19,6 +19,18 @@ draftwright features SRT-100-118_pressure_finger.step --units in
 Reads the drawing's text (a `.pdf` through `pdftotext` from poppler-utils, or a `.txt`) and
 reports each size and each hole, boss and slot location that the drawing does not state.
 
+**Where a number sits.** From a PDF, each word's position is read (`pdftotext -bbox`), and:
+
+- the title block (the region right of and below its labels: DWG, SCALE, SHEET, TOLERANCES …)
+  and the zone border are left out, so `±.005` in a tolerance block or a zone number never states
+  a size;
+- prose lines are notes: a run of words with lower-case letters (drawing callouts are capitals),
+  or six or more words mostly of letters. A number found only in a note still counts as stated,
+  and is listed in `only_in_notes`: a dimension given only in a notes block or in modelling
+  instructions is worth a look. Everything else is a view.
+
+A `.txt` drawing has no positions, so all of it counts as a view (`read_layout: false`).
+
 **Sizes** count when the text holds the number at one to four places, with or without a
 leading zero. A diameter is also found as its radius and a radius as its diameter. A THRU hole's
 depth and a countersink's depth are not asked for.
@@ -47,4 +59,5 @@ STEP file's drawing number is its name up to the first `_` (`SRT-100-118_pressur
 `SRT-100-118`). A sheet belongs to the number its title block prints, the number printed last on
 the page; a drawing of several sheets is checked against all of them. A part no title block
 carries is checked against the page that mentions it with the fewest other numbers, and says so
-(`page_note`). The result totals what is not stated across the set and lists each part's report.
+(`page_note`). The result totals what is not stated across the set (and what is stated only in
+notes) and lists each part's report.

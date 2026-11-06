@@ -250,7 +250,8 @@ fn run(args: &[String]) -> Result<Value, Error> {
             .iter()
             .map(|p| draftwright::inventory::drawing_number(p))
             .collect();
-        let found = draftwright::inventory::match_pages(&numbers, &pages);
+        let texts: Vec<String> = pages.iter().map(|p| p.text.clone()).collect();
+        let found = draftwright::inventory::match_pages(&numbers, &texts);
         let mut parts = Vec::new();
         for ((step, number), page) in steps.iter().zip(&numbers).zip(found) {
             let name = step
@@ -262,15 +263,11 @@ fn run(args: &[String]) -> Result<Value, Error> {
                 continue;
             };
             let sheets: Vec<usize> = found.pages.iter().map(|i| i + 1).collect();
-            let text: String = found
-                .pages
-                .iter()
-                .map(|&i| pages[i].as_str())
-                .collect::<Vec<_>>()
-                .join("\n");
+            let drawing =
+                draftwright::inventory::Drawing::join(found.pages.iter().map(|&i| &pages[i].drawing));
             let result = guarded("check", || {
                 let analysis = api::analyse_part(step, None, Features::Native)?;
-                Ok(draftwright::inventory::check_report(&analysis, &text, unit))
+                Ok(draftwright::inventory::check_report(&analysis, &drawing, unit))
             });
             let note = (found.how == "mentioned").then_some(
                 "no sheet carries this number in its title block; checked against the page that mentions it",
@@ -300,6 +297,10 @@ fn run(args: &[String]) -> Result<Value, Error> {
             "pages": pages.len(),
             "sizes_not_stated": tally("sizes"),
             "locations_not_stated": tally("locations"),
+            "only_in_notes": parts
+                .iter()
+                .map(|p| p["only_in_notes"].as_array().map_or(0, Vec::len))
+                .sum::<usize>(),
             "parts": parts,
         }));
     }
@@ -311,7 +312,7 @@ fn run(args: &[String]) -> Result<Value, Error> {
                 Error::invalid("check needs --drawing <drawing.pdf | drawing.txt>")
             })?;
             Some(
-                draftwright::inventory::drawing_text(std::path::Path::new(path))
+                draftwright::inventory::drawing(std::path::Path::new(path))
                     .map_err(Error::invalid)?,
             )
         } else {
@@ -336,7 +337,7 @@ fn run(args: &[String]) -> Result<Value, Error> {
                 )?,
             };
             Ok(match &drawing {
-                Some(text) => draftwright::inventory::check_report(&analysis, text, unit),
+                Some(drawing) => draftwright::inventory::check_report(&analysis, drawing, unit),
                 None => draftwright::inventory::report(&analysis, unit),
             })
         });

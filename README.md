@@ -38,7 +38,8 @@ editor migration.
 
 ## This fork: ASME Y14.5 in inches
 
-This fork (`ethanmarshall/draftwright-rust`, branch `asme-inch`) adds:
+This fork (`ethanmarshall/draftwright-rust`) adds the following. [`docs/asme.md`](docs/asme.md)
+sums up what is different and what is not covered yet.
 
 - **ASME mode.** Put `{"sheet": {"standard": "asme"}}` in the Spec. Lengths print in inches to
   three places with no leading zero, the paper is ANSI A to E with inch scales, the title block

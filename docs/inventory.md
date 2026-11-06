@@ -74,3 +74,11 @@ A drawing draftwright made carries its Spec in the PDF. For one of those, `check
 the drawing's review with that Spec and returns its coverage findings, with their fixes, as
 `spec_fixes`: the edits that would make draftwright state what is missing. Any other drawing is
 edited where it was made; the punch list says what to add.
+
+## Cache
+
+`features`, `check` and `check-set` keep each part's Analysis in a cache (`DRAFTWRIGHT_CACHE`,
+else `~/.cache/draftwright/analyses`), keyed by the STEP file's SHA-256, the part and this build.
+Checking an unchanged part again skips recognition: the 26-part SRT-100 set re-checks in about
+half a second instead of 45. A changed file, or a new build, analyses afresh; `--no-cache` always
+does.

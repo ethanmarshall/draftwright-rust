@@ -61,6 +61,11 @@
 //! Spec's `sheet/standard`, so one Spec draws either way. A check then reports in the standard's
 //! unit (inches for asme, millimetres for iso) unless `--units` says otherwise.
 //!
+//! `features`, `check` and `check-set` keep each part's Analysis in a cache
+//! (`DRAFTWRIGHT_CACHE`, else `~/.cache/draftwright/analyses`), keyed by the STEP file's SHA-256
+//! and this build, so checking an unchanged part again skips recognition; `--no-cache` analyses
+//! afresh.
+//!
 //! Exit codes: 0 done; 2 the request is invalid (the JSON error says what would be accepted);
 //! 1 something failed and nothing was written in its place.
 
@@ -120,6 +125,63 @@ fn main() -> ExitCode {
             ExitCode::from(if error.code == "invalid" { 2 } else { 1 })
         }
     }
+}
+
+/// Where analyses are cached: `DRAFTWRIGHT_CACHE`, or `draftwright/analyses` under the user's
+/// cache folder (`XDG_CACHE_HOME`, else `~/.cache`).
+fn cache_dir() -> Option<std::path::PathBuf> {
+    if let Some(dir) = std::env::var_os("DRAFTWRIGHT_CACHE") {
+        return Some(std::path::PathBuf::from(dir));
+    }
+    let base = std::env::var_os("XDG_CACHE_HOME")
+        .map(std::path::PathBuf::from)
+        .or_else(|| std::env::var_os("HOME").map(|h| std::path::Path::new(&h).join(".cache")))?;
+    Some(base.join("draftwright").join("analyses"))
+}
+
+/// The part's Analysis with its native features, from the cache when the same file (by its
+/// SHA-256) was analysed by this same build, else analysed and cached. A check of an unchanged
+/// set then skips recognition. A cache that cannot be read or written is passed over.
+fn cached_analysis(
+    step: &std::path::Path,
+    part: Option<usize>,
+    use_cache: bool,
+) -> Result<draftwright::model::Analysis, Error> {
+    use sha2::Digest;
+    let key = use_cache
+        .then(|| {
+            let bytes = std::fs::read(step).ok()?;
+            let build = std::env::current_exe()
+                .and_then(|e| e.metadata())
+                .and_then(|m| m.modified())
+                .ok()
+                .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+                .map_or(0, |d| d.as_secs());
+            let mut h = sha2::Sha256::new();
+            h.update(&bytes);
+            h.update(format!("|{part:?}|{}|{build}", env!("CARGO_PKG_VERSION")).as_bytes());
+            let digest: String = h.finalize().iter().map(|b| format!("{b:02x}")).collect();
+            Some(cache_dir()?.join(format!("{digest}.json")))
+        })
+        .flatten();
+    if let Some(path) = &key
+        && let Ok(text) = std::fs::read_to_string(path)
+        && let Ok(analysis) = serde_json::from_str(&text)
+    {
+        return Ok(analysis);
+    }
+    let analysis = api::analyse_part(step, part, Features::Native)?;
+    if let Some(path) = key
+        && let Some(dir) = path.parent()
+        && std::fs::create_dir_all(dir).is_ok()
+        && let Ok(text) = serde_json::to_string(&analysis)
+    {
+        let tmp = path.with_extension("tmp");
+        if std::fs::write(&tmp, text).is_ok() {
+            let _ = std::fs::rename(&tmp, &path);
+        }
+    }
+    Ok(analysis)
 }
 
 /// The value after flag *name*, if given.
@@ -185,6 +247,7 @@ fn run(args: &[String]) -> Result<Value, Error> {
         None => Value::Null,
     };
     let no_features = args.iter().any(|a| a == "--no-features");
+    let no_cache = args.iter().any(|a| a == "--no-cache");
     let part = flag(args, "--part")
         .map(|k| {
             k.parse::<usize>().map_err(|_| {
@@ -268,7 +331,7 @@ fn run(args: &[String]) -> Result<Value, Error> {
             let drawing =
                 draftwright::inventory::Drawing::join(found.pages.iter().map(|&i| &pages[i].drawing));
             let result = guarded("check", || {
-                let analysis = api::analyse_part(step, None, Features::Native)?;
+                let analysis = cached_analysis(step, None, !no_cache)?;
                 Ok(draftwright::inventory::check_report(&analysis, &drawing, unit))
             });
             let note = (found.how == "mentioned").then_some(
@@ -346,10 +409,10 @@ fn run(args: &[String]) -> Result<Value, Error> {
         return guarded(command, || {
             let analysis = match given {
                 Some(a) => a,
-                None => api::analyse_part(
+                None => cached_analysis(
                     std::path::Path::new(step.expect("a STEP file without an analysis")),
                     part,
-                    Features::Native,
+                    !no_cache,
                 )?,
             };
             let Some(drawing) = &drawing else {

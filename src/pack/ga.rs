@@ -1,6 +1,6 @@
 //! Pack-only general assembly: the ordinary envelope/view/sheet/HLR pipeline, with
 //! visible, source-owned item references and a bottom-up ISO 7573 parts list.
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
 use haecceity::geom;
@@ -58,6 +58,10 @@ pub struct GaSpec {
     pub balloons: BTreeMap<u32, BalloonSpec>,
     /// None: draw the required parts list above the title block.
     pub parts_list: Option<bool>,
+    /// Product (or group) keys left out of the GA's views: still in the parts list, without a
+    /// balloon. For hardware whose geometry the kernel cannot resolve, which would otherwise
+    /// refuse the whole GA.
+    pub omit: Vec<String>,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
@@ -732,6 +736,148 @@ fn layout(
     ))
 }
 
+/// The STEP text without the shape placements of *products* (by name and id): each occurrence's
+/// CONTEXT_DEPENDENT_SHAPE_REPRESENTATION is dropped, found through PRODUCT →
+/// PRODUCT_DEFINITION_FORMATION → PRODUCT_DEFINITION → NEXT_ASSEMBLY_USAGE_OCCURRENCE (as the
+/// related definition) → PRODUCT_DEFINITION_SHAPE. Nothing refers to that entity, so the rest of
+/// the file, and every other entity's number, is unchanged.
+pub(crate) fn without_products(bytes: &[u8], products: &[(&str, &str)]) -> Vec<u8> {
+    let text = String::from_utf8_lossy(bytes);
+    // (start, end, id, type, refs) of each `#id=TYPE(...);` entity, split outside strings.
+    let mut entities = Vec::new();
+    let (mut start, mut quoted) = (0usize, false);
+    for (i, c) in text.char_indices() {
+        match c {
+            '\'' => quoted = !quoted,
+            ';' if !quoted => {
+                let body = &text[start..i];
+                let trimmed = body.trim_start();
+                if let Some(rest) = trimmed.strip_prefix('#')
+                    && let Some((id, rest)) = rest.split_once('=')
+                    && let Ok(id) = id.trim().parse::<u64>()
+                {
+                    let rest = rest.trim_start();
+                    // A complex instance, `(A(...)B(...))`, has no single type: kind "".
+                    let kind: String = rest
+                        .chars()
+                        .take_while(|c| c.is_ascii_alphanumeric() || *c == '_')
+                        .collect();
+                    entities.push((start + (body.len() - trimmed.len()), i + 1, id, kind, rest.to_string()));
+                }
+                start = i + 1;
+            }
+            _ => {}
+        }
+    }
+    let refs = |args: &str| -> Vec<u64> {
+        let mut out = Vec::new();
+        let mut quoted = false;
+        let chars: Vec<char> = args.chars().collect();
+        let mut i = 0;
+        while i < chars.len() {
+            match chars[i] {
+                '\'' => quoted = !quoted,
+                '#' if !quoted => {
+                    let digits: String =
+                        chars[i + 1..].iter().take_while(|c| c.is_ascii_digit()).collect();
+                    if let Ok(n) = digits.parse() {
+                        out.push(n);
+                    }
+                    i += digits.len();
+                }
+                _ => {}
+            }
+            i += 1;
+        }
+        out
+    };
+    let strings = |args: &str| -> Vec<String> {
+        let mut out = Vec::new();
+        let mut it = args.split('\'');
+        it.next();
+        while let Some(s) = it.next() {
+            out.push(s.to_string());
+            it.next();
+        }
+        out
+    };
+    let product: BTreeSet<u64> = entities
+        .iter()
+        .filter(|e| e.3 == "PRODUCT")
+        .filter(|e| {
+            let s = strings(&e.4);
+            products.iter().any(|(name, id)| {
+                s.first().is_some_and(|x| x == id) && s.get(1).is_some_and(|x| x == name)
+            })
+        })
+        .map(|e| e.2)
+        .collect();
+    let pick = |kinds: &[&str], from: &BTreeSet<u64>, nth: Option<usize>| -> BTreeSet<u64> {
+        entities
+            .iter()
+            .filter(|e| kinds.contains(&e.3.as_str()))
+            .filter(|e| {
+                let r = refs(&e.4);
+                match nth {
+                    Some(n) => r.get(n).is_some_and(|x| from.contains(x)),
+                    None => r.iter().any(|x| from.contains(x)),
+                }
+            })
+            .map(|e| e.2)
+            .collect()
+    };
+    let formation = pick(
+        &["PRODUCT_DEFINITION_FORMATION", "PRODUCT_DEFINITION_FORMATION_WITH_SPECIFIED_SOURCE"],
+        &product,
+        None,
+    );
+    let definition = pick(&["PRODUCT_DEFINITION"], &formation, None);
+    let usage = pick(&["NEXT_ASSEMBLY_USAGE_OCCURRENCE"], &definition, Some(1));
+    // Drop each occurrence (and the product's own shape definition) and everything that refers
+    // to it, transitively: its
+    // PRODUCT_DEFINITION_SHAPE, CONTEXT_DEPENDENT_SHAPE_REPRESENTATION, styling and attributes.
+    // Geometry never refers to an occurrence, so no shape is lost but the placement.
+    let mut referrers: BTreeMap<u64, Vec<usize>> = BTreeMap::new();
+    let parsed: Vec<Vec<u64>> = entities.iter().map(|e| refs(&e.4)).collect();
+    for (i, r) in parsed.iter().enumerate() {
+        for x in r {
+            referrers.entry(*x).or_default().push(i);
+        }
+    }
+    let index: BTreeMap<u64, usize> = entities.iter().enumerate().map(|(i, e)| (e.2, i)).collect();
+    // And the product's own shape definition, or a reader takes the unplaced product as a root.
+    let own_shape = pick(&["PRODUCT_DEFINITION_SHAPE"], &definition, None);
+    let mut gone: BTreeSet<usize> = usage
+        .iter()
+        .chain(&own_shape)
+        .filter_map(|id| index.get(id).copied())
+        .collect();
+    let mut queue: Vec<usize> = gone.iter().copied().collect();
+    while let Some(i) = queue.pop() {
+        // The representation relationship a CDSR names first goes with it.
+        if entities[i].3 == "CONTEXT_DEPENDENT_SHAPE_REPRESENTATION"
+            && let Some(j) = parsed[i].first().and_then(|r| index.get(r))
+            && gone.insert(*j)
+        {
+            queue.push(*j);
+        }
+        for &j in referrers.get(&entities[i].2).map(Vec::as_slice).unwrap_or(&[]) {
+            if gone.insert(j) {
+                queue.push(j);
+            }
+        }
+    }
+    let dropped: Vec<(usize, usize)> = gone.iter().map(|&i| (entities[i].0, entities[i].1)).collect();
+    let mut out = String::with_capacity(text.len());
+    let mut at = 0;
+    for (a, b) in dropped {
+        out.push_str(&text[at..a]);
+        at = b;
+    }
+    out.push_str(&text[at..]);
+    out.into_bytes()
+}
+
 pub(super) fn prepare<'a>(
     step: &Path,
     document: &Document,
@@ -741,9 +887,38 @@ pub(super) fn prepare<'a>(
     reused: &BTreeMap<usize, (&haecceity::Part, &Analysis)>,
     aliases: &BTreeMap<usize, super::Alias>,
 ) -> Result<Prepared, Error> {
-    let bytes = document.bytes();
     let started = std::time::Instant::now();
     let rows: Vec<_> = rows.collect();
+    // Left out of the views: every product of an omitted group key, or one omitted product.
+    let mut omitted_parts = BTreeSet::new();
+    for key in &settings.omit {
+        let mut found = false;
+        for row in &rows {
+            if &row.key == key {
+                omitted_parts.extend(row.part_indices.iter().copied());
+                found = true;
+            } else if let Some(at) = row.products.iter().position(|p| p == key) {
+                omitted_parts.insert(row.part_indices[at]);
+                found = true;
+            }
+        }
+        if !found {
+            return Err(Error::invalid(format!(
+                "ga/omit: {key:?} is not a product or group of this assembly"
+            )));
+        }
+    }
+    let filtered;
+    let bytes = if omitted_parts.is_empty() {
+        document.bytes()
+    } else {
+        let products: Vec<(&str, &str)> = omitted_parts
+            .iter()
+            .map(|&i| (file.parts[i].name.as_str(), file.parts[i].product_id.as_str()))
+            .collect();
+        filtered = without_products(document.bytes(), &products);
+        &filtered[..]
+    };
     let radius = settings.balloon_radius.unwrap_or_else(|| {
         rows.iter()
             .map(|r| crate::dims::font().advance(&r.item.to_string(), crate::dims::TEXT) / 2. + 2.)

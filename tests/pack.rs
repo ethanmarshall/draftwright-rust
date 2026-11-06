@@ -1178,3 +1178,24 @@ fn same_as_joins_a_product_to_another_group() {
     );
     assert!(pack::build(&fixture("pack-small.step.gz"), &spec).is_err());
 }
+
+/// `ga.omit` leaves a product out of the GA's views (its occurrences, not its row): it is still
+/// listed, without a balloon, and the rest is drawn. An unknown key is refused.
+#[test]
+fn ga_omit_leaves_a_product_out_of_the_views() {
+    let spec: PackSpec = serde_json::from_value(json!({
+        "schema": pack::SPEC_SCHEMA, "ga": { "omit": ["pin"] }
+    }))
+    .unwrap();
+    let pack = pack::build(&fixture("assembly.step"), &spec).unwrap();
+    let ga = pack.report.general_assembly.as_ref().expect("a GA");
+    let item = |name: &str| pack.report.rows.iter().find(|r| r.name == name).unwrap().item;
+    assert!(ga.unballooned.contains(&item("pin")), "{:?}", ga.unballooned);
+    assert!(ga.balloons.iter().any(|b| b.item == item("plate")));
+    assert!(pack.report.rows.iter().any(|r| r.name == "pin"), "still listed");
+    let bad: PackSpec = serde_json::from_value(json!({
+        "schema": pack::SPEC_SCHEMA, "ga": { "omit": ["no such part"] }
+    }))
+    .unwrap();
+    assert!(pack::build(&fixture("assembly.step"), &bad).is_err());
+}

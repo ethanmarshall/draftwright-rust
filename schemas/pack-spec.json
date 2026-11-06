@@ -230,6 +230,14 @@
             null
           ],
           "description": "Override the enlarged region standard scale; it must exceed the carrying section scale."
+        },
+        "omit": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": "Product or group keys left out of the GA's views: still listed, without a balloon. For hardware whose geometry the kernel cannot resolve."
         }
       }
     },

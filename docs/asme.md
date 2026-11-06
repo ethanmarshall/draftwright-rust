@@ -48,6 +48,10 @@ Parts the geometry check keeps apart (a symmetric part placed mirrored, or a re-
 can be counted together with `parts/<key>/same_as: "<other key>"`: the author's word, reported as
 `pack_same_as` since the geometry is not proven identical.
 
+`ga.omit: ["<key>", ...]` leaves products out of the general assembly's views (they stay in the
+parts list, without a balloon): for hardware whose geometry the kernel cannot resolve, which
+otherwise refuses the whole GA.
+
 ## Government drawing fields
 
 For a drawing package that goes to a government customer, an ASME sheet carries:

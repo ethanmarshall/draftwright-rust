@@ -42,9 +42,19 @@ pub(crate) fn clean(value: f64) -> f64 {
 /// no leading zero; otherwise the shortest millimetre nominal ([`format_angle`]'s rule).
 pub(crate) fn format(value: f64) -> String {
     if crate::standard::asme() && !comparison() {
+        if crate::standard::dual() {
+            return format!("{} [{}]", crate::standard::inch(value), millimetres(value));
+        }
         return crate::standard::inch(value);
     }
     format_angle(value)
+}
+
+/// A dual dimension's millimetres: two places at most, trailing zeros dropped (`6.35`, `12.7`).
+fn millimetres(value: f64) -> String {
+    let text = format!("{:.2}", clean(value));
+    let text = text.trim_end_matches('0').trim_end_matches('.');
+    if text == "-0" { "0".into() } else { text.into() }
 }
 
 /// A unitless number (an angle in degrees, a count, a ratio) as labels print it: shortest within

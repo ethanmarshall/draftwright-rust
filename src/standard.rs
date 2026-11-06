@@ -20,6 +20,7 @@ use std::cell::Cell;
 
 thread_local! {
     static ASME: Cell<bool> = const { Cell::new(false) };
+    static DUAL: Cell<bool> = const { Cell::new(false) };
 }
 
 /// The Spec's standards (`sheet/standard`).
@@ -30,23 +31,32 @@ pub fn asme() -> bool {
     ASME.get()
 }
 
-/// Restores the previous standard when dropped.
-pub struct Guard(bool);
+/// Whether an ASME sheet prints each length's millimetres after its inches (`.250 [6.35]`).
+pub fn dual() -> bool {
+    ASME.get() && DUAL.get()
+}
+
+/// Restores the previous standard (and dual dimensioning) when dropped.
+pub struct Guard(bool, bool);
 
 impl Drop for Guard {
     fn drop(&mut self) {
         ASME.set(self.0);
+        DUAL.set(self.1);
     }
 }
 
 /// Makes *spec*'s standard current until the guard is dropped.
 pub fn scope(spec: &crate::model::Spec) -> Guard {
-    set(spec.sheet.standard.as_deref() == Some("asme"))
+    let guard = set(spec.sheet.standard.as_deref() == Some("asme"));
+    DUAL.set(spec.sheet.dual_dimensions == Some(true));
+    guard
 }
 
-/// Makes ASME current (true) or ISO (false) until the guard is dropped.
+/// Makes ASME current (true) or ISO (false) until the guard is dropped; dual dimensioning is
+/// left as it is.
 pub fn set(asme: bool) -> Guard {
-    Guard(ASME.replace(asme))
+    Guard(ASME.replace(asme), DUAL.get())
 }
 
 /// Runs *run* with *spec*'s standard current.

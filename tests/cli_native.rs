@@ -378,3 +378,20 @@ fn check_fix_writes_a_punch_list() {
     let md = std::fs::read_to_string(&punch).unwrap();
     assert!(md.contains("## Nothing to add\n\nplate_fix"), "{md}");
 }
+
+/// `sheet/dual_dimensions` prints each length's millimetres in brackets after its inches on an
+/// ASME sheet, and is refused on an ISO one.
+#[test]
+fn dual_dimensions_print_millimetres_after_inches() {
+    let step = fixture("parts/plate.step");
+    let step = step.to_str().unwrap();
+    let spec = scratch("dual.json");
+    std::fs::write(&spec, r#"{"sheet":{"standard":"asme","dual_dimensions":true}}"#).unwrap();
+    let (code, review) = run(&["review", step, "--spec", spec.to_str().unwrap()]);
+    assert_eq!(code, Some(0), "{review}");
+    let svg = review["svg"].as_str().unwrap();
+    assert!(svg.contains("2.362 [60]"), "the plate's 60 mm length");
+    assert!(review["lint"].as_array().unwrap().is_empty(), "{}", review["lint"]);
+    let (code, refused) = run(&["review", step, "--spec", spec.to_str().unwrap(), "--standard", "iso"]);
+    assert_eq!(code, Some(2), "{refused}");
+}

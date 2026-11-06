@@ -655,6 +655,10 @@ pub struct SheetSpec {
         deserialize_with = "drawing_standard"
     )]
     pub standard: Option<String>,
+    /// Under `asme`, print each length's millimetres after its inches in brackets
+    /// (`.250 [6.35]`); refused under `iso` ([`crate::standard`]).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub dual_dimensions: Option<bool>,
     /// `A4` … `A0`; under `asme` also ANSI `A` … `E` (`B` is the rank of `A3`).
     #[serde(
         skip_serializing_if = "Option::is_none",
@@ -5526,7 +5530,13 @@ fn plan_with_presentation(
     crate::dims::check_views(spec)?;
     crate::placement_intent::check(spec)?;
     crate::label_text::check(spec)?;
-    title_block::check(&spec.sheet.title)?;
+    crate::standard::with(spec, || title_block::check(&spec.sheet.title))?;
+    if spec.sheet.dual_dimensions == Some(true) && spec.sheet.standard.as_deref() != Some("asme") {
+        return Err(invalid(
+            "sheet/dual_dimensions prints millimetres after inches, so it needs sheet/standard asme.",
+            &[],
+        ));
+    }
     crate::notes::check(&spec.notes)?;
     crate::tables::check(&spec.tables)?;
     crate::gears::check(&spec.gears)?;
@@ -9187,7 +9197,7 @@ pub fn edit(spec: &Spec, ops: &serde_json::Value) -> Result<Spec, Invalid> {
     crate::dims::check_views(&spec)?;
     crate::placement_intent::check(&spec)?;
     crate::label_text::check(&spec)?;
-    title_block::check(&spec.sheet.title)?;
+    crate::standard::with(&spec, || title_block::check(&spec.sheet.title))?;
     crate::notes::check(&spec.notes)?;
     crate::tables::check(&spec.tables)?;
     crate::gears::check(&spec.gears)?;

@@ -35,6 +35,25 @@ always prints them: `⌀.132 LC2 +.0005 -.0000`. The table runs to 19.69 in and 
 consistency by a unit test in [`src/ansi_fits.rs`](../src/ansi_fits.rs). An ISO sheet refuses
 these classes.
 
+## Government drawing fields
+
+For a drawing package that goes to a government customer, an ASME sheet carries:
+
+- **CAGE CODE**, a cell in the title block's top row, blank unless `sheet/title/cage` gives it.
+  An ISO sheet has no such cell and refuses the key.
+- **Dual dimensions**: `sheet/dual_dimensions: true` prints each length's millimetres after its
+  inches, `.250 [6.35]`. Tolerance limits stay in inches. Refused on an ISO sheet.
+- **Revision block and distribution statement** as corner tables (`tables`, see `model.md`).
+  [`asme-gov-spec.json`](asme-gov-spec.json) is a starting Spec: the title block fields, a
+  revision block top right and a distribution statement bottom left, all blank. Fill them from
+  the contract. Distribution statement A reads `DISTRIBUTION STATEMENT A. APPROVED FOR PUBLIC
+  RELEASE; DISTRIBUTION IS UNLIMITED.`; B to F carry the reason, date and controlling office the
+  contract names (DoDI 5230.24), each line its own table row.
+
+```
+draftwright render part.step --spec docs/asme-gov-spec.json -o out
+```
+
 ## Commands added
 
 ```

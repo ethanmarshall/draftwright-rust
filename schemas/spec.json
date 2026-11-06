@@ -1254,6 +1254,17 @@
             }
           ]
         },
+        "dual_dimensions": {
+          "anyOf": [
+            {
+              "type": "boolean",
+              "description": "ASME sheets only: print each length with its millimetres in brackets after the inches (.250 [6.35])."
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "default_finish": {
           "anyOf": [
             {

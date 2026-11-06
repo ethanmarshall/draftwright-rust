@@ -330,6 +330,9 @@ fn a_title_key_with_no_cell_is_refused() {
         assert!(model::edit(&Spec::default(), &ops).is_err(), "{key}");
     }
     for (key, field) in title_block::KEYS {
+        if key == "cage" {
+            continue; // the ASME grid's (asme_title_block_has_a_cage_code_cell)
+        }
         let (plan, _) = sheet("A4", json!({ key: "X" }));
         let expected = if key == "drawn_by" {
             "X / draftwright"
@@ -932,4 +935,34 @@ fn drawing_numbers_require_a_leading_token_with_only_internal_hyphens() {
         let p = model::plan(&a, &Spec::default()).unwrap();
         assert_eq!(p.sheet.title["number"], expected, "{product}");
     }
+}
+
+/// An ASME sheet's title block has a CAGE CODE cell, blank until `sheet/title/cage` gives it; an
+/// ISO sheet has none, and refuses the key rather than dropping it.
+#[test]
+fn asme_title_block_has_a_cage_code_cell() {
+    let (part, analysis) = plate();
+    let asme = |title: serde_json::Value| -> Plan {
+        let spec: Spec = serde_json::from_value(
+            json!({ "sheet": { "standard": "asme", "size": "A4", "title": title } }),
+        )
+        .unwrap();
+        let plan = model::plan(analysis, &spec).unwrap();
+        model::render(part, analysis, &plan, &font()).unwrap();
+        plan
+    };
+    let plan = asme(json!({ "cage": "1ABC2" }));
+    assert_eq!(cell(&plan, "cage_code").value.as_deref(), Some("1ABC2"));
+    assert_eq!(cell(&plan, "cage_code").label, "CAGE CODE");
+    let plan = asme(json!({}));
+    assert_eq!(cell(&plan, "cage_code").value, None);
+    let edited = model::edit(
+        &serde_json::from_value(json!({ "sheet": { "standard": "asme" } })).unwrap(),
+        &json!([{ "op": "set", "path": "sheet/title/cage", "value": "1ABC2" }]),
+    );
+    assert!(edited.is_ok(), "{edited:?}");
+    let iso: Spec =
+        serde_json::from_value(json!({ "sheet": { "title": { "cage": "1ABC2" } } })).unwrap();
+    let refused = model::plan(analysis, &iso).unwrap_err();
+    assert!(refused.message.contains("ASME"), "{refused:?}");
 }

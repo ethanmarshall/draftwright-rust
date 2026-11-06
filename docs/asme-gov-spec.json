@@ -1,0 +1,35 @@
+{
+  "sheet": {
+    "standard": "asme",
+    "title": {
+      "title": "",
+      "number": "",
+      "revision": "",
+      "cage": "",
+      "company": "",
+      "material": "",
+      "drawn_by": "",
+      "approved_by": "",
+      "date": "",
+      "document_type": "DETAIL DRAWING"
+    }
+  },
+  "tables": [
+    {
+      "id": "t:1",
+      "prefer": "tr",
+      "rows": [
+        ["REV", "DESCRIPTION", "DATE", "APPROVED"],
+        ["", "", "", ""]
+      ]
+    },
+    {
+      "id": "t:2",
+      "prefer": "bl",
+      "rows": [
+        ["DISTRIBUTION STATEMENT"],
+        [""]
+      ]
+    }
+  ]
+}

@@ -290,7 +290,7 @@ mention takes its default.
 
 The design also includes `views/sections` (for example `"sections": [{"id": "A", "through": "f:hole:3"}]`). Feature `anchor` is read for recognition corrections, below; a feature's `note` is read since K1b (below).
 
-- **Fields read:** `sheet` (`size`, `scale`, `preferred_max_size`, `preferred_max_sheets`, `dimension_spacing`, `frame_gutter`, `table_columns`, `title`, `references`, `fit_deviations`, `fit_limits`, `projection`, `standard`, `default_finish`, `hidden`, `centre_marks`, `centre_lines`, `thread_depiction`, `knurl_depiction`), `sheets` (below), `views/<name>` (`omit`, `place`, `sheet`, `hidden`, `centre_marks`, `centre_lines`, `thread_depiction`, `knurl_depiction`, `half_section`),
+- **Fields read:** `sheet` (`size`, `scale`, `preferred_max_size`, `preferred_max_sheets`, `dimension_spacing`, `frame_gutter`, `table_columns`, `title`, `references`, `fit_deviations`, `fit_limits`, `projection`, `standard`, `dual_dimensions`, `default_finish`, `hidden`, `centre_marks`, `centre_lines`, `thread_depiction`, `knurl_depiction`), `sheets` (below), `views/<name>` (`omit`, `place`, `sheet`, `hidden`, `centre_marks`, `centre_lines`, `thread_depiction`, `knurl_depiction`, `half_section`),
   `iso_scale_factor`, `dimension_source`, `dimension_schemes/<name>` (`scheme`, `axis`, `targets`, `view`, `from`), `hole_table` (`auto`, `always`, `never`), `dimensions/<id>` (`omit`, `tolerance`, `fit`, `text`, `style`, `place`, `kind`, `between`, `along`, and the earlier `view`
   spelling), `annotations/<id>` (`omit`, `place`, `text` for prose callouts and automatic notes), `features/<id>` (`fit`, `datum`, `controls`, `finish`, `thread`, `knurl`, `note`, `anchor`, `reclassify`, `suppress`, `split`, `pattern`, `gusset_view`), `feature_declarations`,
   `faces/<face>` (`datum`, `controls`, `finish`, `note`: "Datums and controls authored in the Spec" and "Finish, threads,
@@ -472,6 +472,9 @@ the part is still read, planned and laid out in millimetres; only what is printe
 - a modelled thread that matches a Unified thread is named as one (`1/4-20 UNC`), and a note's
   thread may be given as a Unified designation (`#10-32 UNF-2B`);
 - tolerance limits print as inch deviations (`+.0005`), a zero limit with its sign (`-.0000`);
+- `sheet/dual_dimensions: true` prints each length's millimetres in brackets after its inches
+  (`.250 [6.35]`); refused without `asme`;
+- the title block's top row has a CAGE CODE cell (`sheet/title/cage`), refused on an ISO sheet;
 - `features/<id>/fit` also takes an ANSI B4.1 class, `RC1` … `RC9` (running and sliding) or
   `LC1` … `LC11` (locational clearance), up to 19.69 in ([`src/ansi_fits.rs`](../src/ansi_fits.rs)).
   A hole takes the class's hole limits, a boss its shaft limits, and the label always states

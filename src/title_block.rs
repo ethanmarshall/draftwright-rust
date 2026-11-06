@@ -147,10 +147,28 @@ pub const ROWS: [&[Cell]; 4] = [
     ],
 ];
 
+/// The ASME grid: draftwright's, with a CAGE CODE cell in the top row (ASME Y14.100's title
+/// block names the design activity's CAGE code). Blank unless `sheet/title/cage` gives it.
+pub const ASME_ROWS: [&[Cell]; 4] = [
+    &[
+        cell("legal_owner", 0.55, "LEGAL OWNER"),
+        cell("cage_code", 0.15, "CAGE CODE"),
+        cell("document_type", 0.30, "DOC. TYPE"),
+    ],
+    ROWS[1],
+    ROWS[2],
+    ROWS[3],
+];
+
+/// The grid of the current standard.
+pub fn rows() -> &'static [&'static [Cell]; 4] {
+    if crate::standard::asme() { &ASME_ROWS } else { &ROWS }
+}
+
 /// The spec's `sheet.title` keys (draftwright's `Sheet` options of the same names), each with
 /// the cell it fills. `units` and `format` are not keys: the sheet states them (millimetres, and
 /// the sheet's size), as draftwright does.
-pub const KEYS: [(&str, &str); 11] = [
+pub const KEYS: [(&str, &str); 12] = [
     ("title", "title"),
     ("number", "drawing_number"),
     ("material", "material"),
@@ -162,6 +180,7 @@ pub const KEYS: [(&str, &str); 11] = [
     ("sheet", "sheet"),
     ("company", "legal_owner"),
     ("document_type", "document_type"),
+    ("cage", "cage_code"),
 ];
 
 /// A cell as the plan places it: the field, its label, its box `[x0, y0, x1, y1]` (page mm), and
@@ -187,6 +206,21 @@ pub fn font() -> &'static Font {
 /// with nowhere to go would be dropped in silence (build123d_drafting's `TitleBlock` refuses a
 /// value its layout has no cell for, and draftwright's `Sheet` an option it does not take).
 pub fn check(title: &BTreeMap<String, String>) -> Result<(), Invalid> {
+    // The CAGE code's cell is on the ASME grid only.
+    if title.contains_key("cage") && !crate::standard::asme() {
+        return Err(Invalid {
+            path: None,
+            also: Vec::new(),
+            message: "The ISO title block has no cell for sheet/title/cage; the CAGE CODE cell \
+                      is on ASME sheets (sheet/standard asme)."
+                .into(),
+            choices: KEYS
+                .iter()
+                .filter(|(key, _)| *key != "cage")
+                .map(|(key, _)| key.to_string())
+                .collect(),
+        });
+    }
     match title.keys().find(|k| !KEYS.iter().any(|(key, _)| key == k)) {
         None => Ok(()),
         Some(k) => Err(Invalid {
@@ -317,8 +351,9 @@ pub fn cells(block: [f64; 4], title: &BTreeMap<String, String>, size: &str) -> V
         (!v.is_empty()).then(|| v.to_string())
     };
     let mut out = Vec::new();
-    for (i, row) in ROWS.iter().enumerate() {
-        let bottom = y0 + (ROWS.len() - 1 - i) as f64 * ROW_H;
+    let grid = rows();
+    for (i, row) in grid.iter().enumerate() {
+        let bottom = y0 + (grid.len() - 1 - i) as f64 * ROW_H;
         let mut left = 0.0;
         for (j, c) in row.iter().enumerate() {
             let right = if j + 1 == row.len() {

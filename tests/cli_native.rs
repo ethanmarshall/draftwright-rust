@@ -352,3 +352,29 @@ fn standard_flag_chooses_iso_or_asme() {
     let (code, bad) = run(&["review", step, "--standard", "din"]);
     assert_eq!(code, Some(2), "{bad}");
 }
+
+/// `check --fix` writes a punch list for a drawing, and reads a drawing draftwright made: every
+/// size and location of the plate is stated on its own ASME drawing.
+#[test]
+fn check_fix_writes_a_punch_list() {
+    let step = fixture("parts/plate.step");
+    let step = step.to_str().unwrap();
+    let stem = scratch("plate_fix");
+    let (code, _) = run(&["render", step, "--standard", "asme", "-o", stem.to_str().unwrap()]);
+    assert_eq!(code, Some(0));
+    let pdf = stem.with_extension("pdf");
+    let punch = scratch("plate_fix.md");
+    let (code, report) = run(&[
+        "check",
+        step,
+        "--drawing",
+        pdf.to_str().unwrap(),
+        "--fix",
+        punch.to_str().unwrap(),
+    ]);
+    assert_eq!(code, Some(0), "{report}");
+    assert_eq!(report["sizes"]["not_stated"], 0, "{report}");
+    assert_eq!(report["read_layout"], true);
+    let md = std::fs::read_to_string(&punch).unwrap();
+    assert!(md.contains("## Nothing to add\n\nplate_fix"), "{md}");
+}

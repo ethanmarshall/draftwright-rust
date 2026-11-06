@@ -61,3 +61,16 @@ the page; a drawing of several sheets is checked against all of them. A part no 
 carries is checked against the page that mentions it with the fewest other numbers, and says so
 (`page_note`). The result totals what is not stated across the set (and what is stated only in
 notes) and lists each part's report.
+
+## `--fix punch.md`
+
+`check` and `check-set` take `--fix <file.md>`: a Markdown punch list, per drawing, of what is
+not stated and what is stated only in notes, each with the model's value printed in the
+drawing's unit and the callout that would state it (`Ø.312`, `⌴ Ø.488`, `↧.216`, `R.050`,
+`.015 X 45°`, or a location from both faces on its axis). Drawings with nothing to add are listed
+at the end.
+
+A drawing draftwright made carries its Spec in the PDF. For one of those, `check --fix` also runs
+the drawing's review with that Spec and returns its coverage findings, with their fixes, as
+`spec_fixes`: the edits that would make draftwright state what is missing. Any other drawing is
+edited where it was made; the punch list says what to add.

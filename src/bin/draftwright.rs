@@ -24,7 +24,9 @@
 //! - `draftwright features part.step [--units in|mm] [--analysis a.json]`: every recognised
 //!   feature's sizes and its centre from the part's minimum corner ([`draftwright::inventory`])
 //! - `draftwright check part.step --drawing d.pdf|d.txt [--units in|mm] [--analysis a.json]`:
-//!   which of those sizes and locations a drawing's text does not state
+//!   which of those sizes and locations a drawing's text does not state; `--fix punch.md`
+//!   also writes a punch list with the callout each gap needs (and, for a drawing draftwright
+//!   made, its review's coverage fixes as `spec_fixes`)
 //! - `draftwright check-set parts/ --drawing set.pdf [--units in|mm]`: `check` for every STEP
 //!   file in a folder against its page of a drawing set, the page found by the drawing number
 //!   the file's name starts with (`SRT-100-118_finger.step` is drawing `SRT-100-118`)
@@ -78,7 +80,7 @@ fn main() -> ExitCode {
         match args[0].as_str() {
             "--help" | "-h" => {
                 println!(
-                    "draftwright — engineering drawings from STEP\n\nCommands:\n  analyse <step>\n  plan <step> [--spec spec.json]\n  render <step> [--spec spec.json] -o <stem> [--formats svg,pdf,png]\n  review <step> [--spec spec.json]\n  edit <spec.json> <ops.json>\n  spec <drawing>\n  parts <step>\n  features <step> [--units in|mm]\n  check <step> --drawing <drawing.pdf|.txt> [--units in|mm]\n  check-set <step folder> --drawing <set.pdf> [--units in|mm]\n  pack <step> -o <directory>\n  diff <old.step> <new.step> -o <directory>\n  spec_schema\n  item_options <part_ref> <id> [--spec spec.json]\n  serve\n  mcp-stdio | mcp-http\n\nAny command takes --standard iso|asme to draw (or check) to that standard.\n\nDiscovery: schemas/spec.json, docs/model.md and docs/mcp.md ship in the release.\nJSON-lines serve: {{\"op\":\"hello\"}} lists operations; spec_schema and item_options use the MCP argument shapes.\nUse --version for the release version."
+                    "draftwright — engineering drawings from STEP\n\nCommands:\n  analyse <step>\n  plan <step> [--spec spec.json]\n  render <step> [--spec spec.json] -o <stem> [--formats svg,pdf,png]\n  review <step> [--spec spec.json]\n  edit <spec.json> <ops.json>\n  spec <drawing>\n  parts <step>\n  features <step> [--units in|mm]\n  check <step> --drawing <drawing.pdf|.txt> [--units in|mm] [--fix punch.md]\n  check-set <step folder> --drawing <set.pdf> [--units in|mm] [--fix punch.md]\n  pack <step> -o <directory>\n  diff <old.step> <new.step> -o <directory>\n  spec_schema\n  item_options <part_ref> <id> [--spec spec.json]\n  serve\n  mcp-stdio | mcp-http\n\nAny command takes --standard iso|asme to draw (or check) to that standard.\n\nDiscovery: schemas/spec.json, docs/model.md and docs/mcp.md ship in the release.\nJSON-lines serve: {{\"op\":\"hello\"}} lists operations; spec_schema and item_options use the MCP argument shapes.\nUse --version for the release version."
                 );
                 return ExitCode::SUCCESS;
             }
@@ -292,7 +294,21 @@ fn run(args: &[String]) -> Result<Value, Error> {
                 .map(|p| p[key]["not_stated"].as_u64().unwrap_or(0))
                 .sum()
         };
+        let punch = match flag(args, "--fix") {
+            Some(path) => {
+                let md = draftwright::inventory::punch_list(
+                    &parts,
+                    unit,
+                    &format!("Drawing check punch list: {}", pdf),
+                );
+                std::fs::write(path, md)
+                    .map_err(|e| Error::invalid(format!("cannot write {path}: {e}")))?;
+                json!(path)
+            }
+            None => Value::Null,
+        };
         return Ok(json!({
+            "punch_list": punch,
             "units": match unit { draftwright::inventory::Unit::Inch => "in", _ => "mm" },
             "pages": pages.len(),
             "sizes_not_stated": tally("sizes"),
@@ -336,10 +352,45 @@ fn run(args: &[String]) -> Result<Value, Error> {
                     Features::Native,
                 )?,
             };
-            Ok(match &drawing {
-                Some(drawing) => draftwright::inventory::check_report(&analysis, drawing, unit),
-                None => draftwright::inventory::report(&analysis, unit),
-            })
+            let Some(drawing) = &drawing else {
+                return Ok(draftwright::inventory::report(&analysis, unit));
+            };
+            let mut report = draftwright::inventory::check_report(&analysis, drawing, unit);
+            if let Some(path) = flag(args, "--fix") {
+                // A drawing draftwright made carries its Spec: its review's own coverage
+                // findings say which Spec edits would state what is missing.
+                let source = flag(args, "--drawing").expect("check has --drawing");
+                let embedded = std::fs::read(source)
+                    .ok()
+                    .and_then(|bytes| draftwright::model::embedded_spec(&bytes).ok().flatten());
+                if let (Some(spec), Some(step)) = (embedded, step) {
+                    let review = api::review_part(
+                        std::path::Path::new(step),
+                        part,
+                        Features::Native,
+                        &spec,
+                    )?;
+                    let fixes: Vec<Value> = review
+                        .lint
+                        .iter()
+                        .filter(|i| i.code.contains("requirement"))
+                        .map(|i| json!({ "code": i.code, "message": i.message, "fix": i.fix }))
+                        .collect();
+                    report["spec_fixes"] = json!(fixes);
+                }
+                if let Some(stem) = std::path::Path::new(source).file_stem() {
+                    report["drawing"] = json!(stem.to_string_lossy());
+                }
+                let md = draftwright::inventory::punch_list(
+                    std::slice::from_ref(&report),
+                    unit,
+                    &format!("Drawing check punch list: {source}"),
+                );
+                std::fs::write(path, md)
+                    .map_err(|e| Error::invalid(format!("cannot write {path}: {e}")))?;
+                report["punch_list"] = json!(path);
+            }
+            Ok(report)
         });
     }
     if command == "pack" {

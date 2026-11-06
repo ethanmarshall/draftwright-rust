@@ -561,8 +561,10 @@ pub fn check_report(analysis: &Analysis, drawing: &Drawing, unit: Unit) -> Value
             .filter(|f| f.what.starts_with("location:") && (found || !f.found))
             .count()
     };
+    let [lo, hi] = analysis.envelope;
     serde_json::json!({
         "units": unit.name(),
+        "envelope": std::array::from_fn::<f64, 3, _>(|k| round(unit.of(hi[k] - lo[k]))),
         "sizes": { "checked": sizes(true), "not_stated": sizes(false) },
         "locations": { "checked": locations(true), "not_stated": locations(false) },
         "note": "Locations are found from an edge, the centre, a bolt circle, a chain from another located feature, or a shared centreline. What is left is not stated by any of those; check it by eye. The title block and the zone border do not count; only_in_notes lists numbers stated in a note (prose) but in no view.",
@@ -571,6 +573,147 @@ pub fn check_report(analysis: &Analysis, drawing: &Drawing, unit: Unit) -> Value
         "only_in_notes": findings.iter().filter(|f| f.place == Some("note")).collect::<Vec<_>>(),
         "located_through": findings.iter().filter(|f| f.how.is_some()).collect::<Vec<_>>(),
     })
+}
+
+/// A number as a drawing in *unit* prints it: inches to three places with no leading zero
+/// (`.488`, `1.250`), or millimetres to two places without trailing zeros (`12.4`, `6`).
+pub fn print(value: f64, unit: Unit) -> String {
+    match unit {
+        Unit::Inch => {
+            let s = format!("{:.3}", value.abs());
+            let s = s.strip_prefix('0').unwrap_or(&s).to_string();
+            if value < 0.0 { format!("-{s}") } else { s }
+        }
+        Unit::Mm => {
+            let s = format!("{value:.2}");
+            s.trim_end_matches('0').trim_end_matches('.').to_string()
+        }
+    }
+}
+
+/// The callout a finding asks for, in the drawing's unit: `Ø.488`, `⌴ Ø.488 ↧.010`'s parts,
+/// `R.050`, or a location from both of the part's faces on its axis.
+pub fn callout(what: &str, value: f64, envelope: Option<[f64; 3]>, unit: Unit) -> String {
+    let p = |v: f64| print(v, unit);
+    let Some((kind, name)) = what.split_once(':') else {
+        return p(value);
+    };
+    if kind == "location" {
+        let axis = match name {
+            "x" => 0,
+            "y" => 1,
+            "z" => 2,
+            "circle" => return format!("Ø{} bolt circle", p(value)),
+            _ => return p(value),
+        };
+        let upper = name.to_ascii_uppercase();
+        return match envelope {
+            Some(e) => format!(
+                "{} from the -{upper} face (or {} from the +{upper} face)",
+                p(value),
+                p(e[axis] - value)
+            ),
+            None => format!("{} from the -{upper} face", p(value)),
+        };
+    }
+    let (prefix, leaf) = match name.split_once('.') {
+        Some((head, leaf)) => (head, leaf),
+        None => ("", name),
+    };
+    let lead = match prefix {
+        "spotface" | "cbore" | "counterbore" => "⌴ ",
+        "csink" | "countersink" => "⌵ ",
+        _ => "",
+    };
+    match leaf {
+        "diameter" | "od" | "id" | "major" | "minor" => format!("{lead}Ø{}", p(value)),
+        "radius" => format!("{lead}R{}", p(value)),
+        "depth" => format!("{lead}↧{}", p(value)),
+        "half_width" => format!("{} wide", p(2.0 * value)),
+        "leg1" | "leg2" => match unit {
+            Unit::Inch => format!("{} X 45° (or both legs if unequal)", p(value)),
+            Unit::Mm => format!("C{} (or both legs if unequal)", p(value)),
+        },
+        _ => format!("{lead}{}", p(value)),
+    }
+}
+
+/// A punch list in Markdown for check reports: per drawing, what is not stated and what is
+/// stated only in notes, each with the callout to add. *reports* are `check` results, each with
+/// `drawing` and `pages` when they came from a set.
+pub fn punch_list(reports: &[Value], unit: Unit, title: &str) -> String {
+    let mut out = format!(
+        "# {title}\n\nUnits: {}. Each row is a size or location the model has and the drawing \
+         does not state, with the callout that would state it. Values are the model's; round \
+         them to your drawing's precision and tolerance.\n",
+        unit.name()
+    );
+    let envelope = |r: &Value| -> Option<[f64; 3]> {
+        let a = r.get("envelope")?.as_array()?;
+        Some([a.first()?.as_f64()?, a.get(1)?.as_f64()?, a.get(2)?.as_f64()?])
+    };
+    let rows = |r: &Value, key: &str| -> Vec<String> {
+        r.get(key)
+            .and_then(Value::as_array)
+            .map(|list| {
+                list.iter()
+                    .map(|f| {
+                        let what = f["what"].as_str().unwrap_or("");
+                        let value = f["value"].as_f64().unwrap_or(0.0);
+                        format!(
+                            "| {} | {} | {} | {} |",
+                            f["feature"].as_str().unwrap_or(""),
+                            what,
+                            print(value, unit),
+                            callout(what, value, envelope(r), unit)
+                        )
+                    })
+                    .collect()
+            })
+            .unwrap_or_default()
+    };
+    let mut clean = Vec::new();
+    for r in reports {
+        let name = r
+            .get("drawing")
+            .and_then(Value::as_str)
+            .or_else(|| r.get("step").and_then(Value::as_str))
+            .unwrap_or("drawing");
+        if let Some(e) = r.get("error").and_then(Value::as_str) {
+            out += &format!("\n## {name}\n\nNot checked: {e}\n");
+            continue;
+        }
+        let missing = rows(r, "not_stated");
+        let notes = rows(r, "only_in_notes");
+        if missing.is_empty() && notes.is_empty() {
+            clean.push(name.to_string());
+            continue;
+        }
+        out += &format!("\n## {name}");
+        if let Some(pages) = r.get("pages").and_then(Value::as_array) {
+            let pages: Vec<String> = pages.iter().map(|p| p.to_string()).collect();
+            out += &format!(" (sheet page {})", pages.join(", "));
+        }
+        out.push('\n');
+        if let Some(note) = r.get("page_note").and_then(Value::as_str) {
+            out += &format!("\n{note}.\n");
+        }
+        let header = "\n| Feature | What | Model value | Add |\n|---|---|---|---|\n";
+        if !missing.is_empty() {
+            out += "\nNot stated:\n";
+            out += header;
+            out += &(missing.join("\n") + "\n");
+        }
+        if !notes.is_empty() {
+            out += "\nStated only in a note (no view dimensions it):\n";
+            out += header;
+            out += &(notes.join("\n") + "\n");
+        }
+    }
+    if !clean.is_empty() {
+        out += &format!("\n## Nothing to add\n\n{}\n", clean.join(", "));
+    }
+    out
 }
 
 /// A drawing's printed text, split by where it sits. From a PDF, words in the title block and
@@ -1032,6 +1175,28 @@ mod tests {
         assert!(d.layout);
         assert_eq!(d.view.trim(), "5X Ø.100 X .10 DEEP");
         assert_eq!(d.notes.trim(), "Ø.400 x .070 terminal boss");
+    }
+
+    #[test]
+    fn callouts_read_as_a_drawing_states_them() {
+        let u = Unit::Inch;
+        assert_eq!(print(0.4882, u), ".488");
+        assert_eq!(print(1.25, u), "1.250");
+        assert_eq!(print(6.0, Unit::Mm), "6");
+        assert_eq!(callout("size:spotface.diameter", 0.4882, None, u), "⌴ Ø.488");
+        assert_eq!(callout("size:depth", 0.216, None, u), "↧.216");
+        assert_eq!(
+            callout("location:y", 2.468, Some([5.0, 12.0, 1.0]), u),
+            "2.468 from the -Y face (or 9.532 from the +Y face)"
+        );
+        let report = serde_json::json!({
+            "drawing": "SRT-100-115", "pages": [24], "envelope": [5.0, 12.0, 1.0],
+            "not_stated": [{"feature": "f:hole:2", "what": "location:y", "value": 2.468}],
+        });
+        let md = punch_list(&[report, serde_json::json!({"drawing": "SRT-100-101"})], u, "Check");
+        assert!(md.contains("## SRT-100-115 (sheet page 24)"));
+        assert!(md.contains("| f:hole:2 | location:y | 2.468 | 2.468 from the -Y face"));
+        assert!(md.contains("## Nothing to add\n\nSRT-100-101"));
     }
 
     #[test]

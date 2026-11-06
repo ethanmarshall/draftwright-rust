@@ -44,6 +44,10 @@ the like are listed as bought and not drawn), as one `pack.pdf` plus `pack.csv` 
 The pack Spec's `standard` (`"standard": "asme"`, which `--standard` sets) draws every sheet to
 it; a part's own `drawing` Spec can still set its own. See "Drawing packs" in `model.md`.
 
+Parts the geometry check keeps apart (a symmetric part placed mirrored, or a re-modelled copy)
+can be counted together with `parts/<key>/same_as: "<other key>"`: the author's word, reported as
+`pack_same_as` since the geometry is not proven identical.
+
 ## Government drawing fields
 
 For a drawing package that goes to a government customer, an ASME sheet carries:

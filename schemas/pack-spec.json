@@ -115,6 +115,11 @@
             "to be made"
           ],
           "description": "Case-insensitive stock status; spaces, underscores and hyphens are normalised. Known aliases match the file reader."
+        },
+        "same_as": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Count this product as the same part as the product or group key named here (the author's word, for parts the geometry check keeps apart); its group joins that one."
         }
       }
     },

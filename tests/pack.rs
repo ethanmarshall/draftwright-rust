@@ -1153,3 +1153,28 @@ fn a_pack_standard_reaches_every_drawing() {
         serde_json::from_value(json!({ "schema": pack::SPEC_SCHEMA, "standard": "din" })).unwrap();
     assert!(pack::build(&fixture("assembly.step"), &bad).is_err());
 }
+
+/// `same_as` counts a product as another's part when the geometry check keeps them apart, and
+/// names a product the assembly has; an unknown one is refused.
+#[test]
+fn same_as_joins_a_product_to_another_group() {
+    let base = pack::build(&fixture("pack-small.step.gz"), &PackSpec::default()).unwrap();
+    let made: Vec<_> = base.report.rows.iter().filter(|r| r.supply == Supply::Make).collect();
+    assert!(made.len() >= 2);
+    let (a, b) = (&made[0], &made[1]);
+    let mut spec = PackSpec::default();
+    spec.parts.insert(
+        b.products[0].clone(),
+        PartSpec { same_as: Some(a.products[0].clone()), ..PartSpec::default() },
+    );
+    let joined = pack::build(&fixture("pack-small.step.gz"), &spec).unwrap();
+    let row = joined.report.rows.iter().find(|r| r.products.contains(&a.products[0])).unwrap();
+    assert_eq!(row.qty, a.qty + b.qty);
+    assert!(row.products.contains(&b.products[0]));
+    assert_eq!(joined.report.rows.len(), base.report.rows.len() - 1);
+    spec.parts.insert(
+        b.products[0].clone(),
+        PartSpec { same_as: Some("no such part".into()), ..PartSpec::default() },
+    );
+    assert!(pack::build(&fixture("pack-small.step.gz"), &spec).is_err());
+}

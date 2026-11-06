@@ -51,6 +51,11 @@ pub struct PartSpec {
     pub stock: Option<String>,
     /// Keep this product out of automatic geometry merges.
     pub separate: bool,
+    /// Count this product as the same part as the product (or group) *same_as* names: its
+    /// author's word, for parts the geometry check keeps apart (a mirror-symmetric part placed
+    /// mirrored, or one re-modelled with tiny differences). Its group joins that one's.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub same_as: Option<String>,
     pub drawing: Option<Spec>,
 }
 
@@ -570,6 +575,51 @@ pub fn build(step: &Path, spec: &PackSpec) -> Result<Pack, Error> {
             identity,
             separate,
         });
+    }
+    // Authored merges: a product's group joins the group of the product it is `same_as`.
+    for (key, intent) in &spec.parts {
+        let Some(target) = &intent.same_as else {
+            continue;
+        };
+        let find = |k: &str, groups: &[Group]| {
+            groups
+                .iter()
+                .position(|g| g.row.products.iter().any(|p| p == k) || g.row.key == k)
+        };
+        let (Some(from), Some(to)) = (find(key, &groups), find(target, &groups)) else {
+            return Err(Error::invalid(format!(
+                "parts/{key}/same_as: {target:?} is not a product of this assembly"
+            )));
+        };
+        if from == to {
+            continue;
+        }
+        if groups[from].separate || groups[to].separate {
+            return Err(Error::invalid(format!(
+                "parts/{key}/same_as joins a product marked separate"
+            )));
+        }
+        let moved = groups.remove(from);
+        let to = if from < to { to - 1 } else { to };
+        let row = &mut groups[to].row;
+        findings.push(finding(
+            "pack_same_as",
+            format!(
+                "{} counted as {} (same_as): not proven identical geometry",
+                moved.row.products.join(", "),
+                row.key
+            ),
+            moved.row.products.clone(),
+        ));
+        row.products.extend(moved.row.products);
+        row.bom.product_ids.extend(moved.row.bom.product_ids);
+        row.bom.product_ids.sort();
+        row.bom.product_ids.dedup();
+        row.part_indices.extend(moved.row.part_indices);
+        row.qty = row
+            .qty
+            .checked_add(moved.row.qty)
+            .ok_or_else(|| Error::invalid("pack quantity overflow"))?;
     }
     let mut canonical = BTreeSet::new();
     for g in &mut groups {

@@ -55,6 +55,10 @@
 //! when every body coincides with one part's (`coincident_bodies`), or lies within the largest
 //! body's box (`assembly_principal_drawn`), that part is drawn alone.
 //!
+//! Every command takes `--standard iso|asme`: the drawing standard for this run, set over the
+//! Spec's `sheet/standard`, so one Spec draws either way. A check then reports in the standard's
+//! unit (inches for asme, millimetres for iso) unless `--units` says otherwise.
+//!
 //! Exit codes: 0 done; 2 the request is invalid (the JSON error says what would be accepted);
 //! 1 something failed and nothing was written in its place.
 
@@ -74,7 +78,7 @@ fn main() -> ExitCode {
         match args[0].as_str() {
             "--help" | "-h" => {
                 println!(
-                    "draftwright — engineering drawings from STEP\n\nCommands:\n  analyse <step>\n  plan <step> [--spec spec.json]\n  render <step> [--spec spec.json] -o <stem> [--formats svg,pdf,png]\n  review <step> [--spec spec.json]\n  edit <spec.json> <ops.json>\n  spec <drawing>\n  parts <step>\n  features <step> [--units in|mm]\n  check <step> --drawing <drawing.pdf|.txt> [--units in|mm]\n  check-set <step folder> --drawing <set.pdf> [--units in|mm]\n  pack <step> -o <directory>\n  diff <old.step> <new.step> -o <directory>\n  spec_schema\n  item_options <part_ref> <id> [--spec spec.json]\n  serve\n  mcp-stdio | mcp-http\n\nDiscovery: schemas/spec.json, docs/model.md and docs/mcp.md ship in the release.\nJSON-lines serve: {{\"op\":\"hello\"}} lists operations; spec_schema and item_options use the MCP argument shapes.\nUse --version for the release version."
+                    "draftwright — engineering drawings from STEP\n\nCommands:\n  analyse <step>\n  plan <step> [--spec spec.json]\n  render <step> [--spec spec.json] -o <stem> [--formats svg,pdf,png]\n  review <step> [--spec spec.json]\n  edit <spec.json> <ops.json>\n  spec <drawing>\n  parts <step>\n  features <step> [--units in|mm]\n  check <step> --drawing <drawing.pdf|.txt> [--units in|mm]\n  check-set <step folder> --drawing <set.pdf> [--units in|mm]\n  pack <step> -o <directory>\n  diff <old.step> <new.step> -o <directory>\n  spec_schema\n  item_options <part_ref> <id> [--spec spec.json]\n  serve\n  mcp-stdio | mcp-http\n\nAny command takes --standard iso|asme to draw (or check) to that standard.\n\nDiscovery: schemas/spec.json, docs/model.md and docs/mcp.md ship in the release.\nJSON-lines serve: {{\"op\":\"hello\"}} lists operations; spec_schema and item_options use the MCP argument shapes.\nUse --version for the release version."
                 );
                 return ExitCode::SUCCESS;
             }
@@ -139,10 +143,40 @@ fn run(args: &[String]) -> Result<Value, Error> {
             .map(String::as_str)
             .ok_or_else(|| Error::invalid(usage))
     };
-    let spec = match flag(args, "--spec") {
+    let mut spec = match flag(args, "--spec") {
         Some(path) => read_json(path)?,
         None => Value::Null,
     };
+    // `--standard iso|asme` chooses the drawing standard for this run, over the Spec's own
+    // `sheet/standard`; the same Spec can so be drawn either way.
+    let standard = flag(args, "--standard")
+        .map(|s| match s.to_ascii_lowercase().as_str() {
+            "iso" => Ok("iso"),
+            "asme" => Ok("asme"),
+            other => Err(Error::invalid(format!(
+                "--standard {other:?} is not a drawing standard; give iso or asme"
+            ))),
+        })
+        .transpose()?;
+    if let Some(standard) = standard {
+        if spec.is_null() {
+            spec = json!({});
+        }
+        let Some(object) = spec.as_object_mut() else {
+            return Err(Error::invalid("the Spec is not a JSON object"));
+        };
+        let sheet = object.entry("sheet").or_insert_with(|| json!({}));
+        let Some(sheet) = sheet.as_object_mut() else {
+            return Err(Error::invalid("the Spec's sheet is not a JSON object"));
+        };
+        sheet.insert("standard".into(), json!(standard));
+    }
+    // A check reports in the standard's unit unless --units says otherwise.
+    let units = flag(args, "--units").or(match standard {
+        Some("asme") => Some("in"),
+        Some(_) => Some("mm"),
+        None => None,
+    });
     let features = flag(args, "--features");
     let analysis = match flag(args, "--analysis") {
         Some(path) => read_json(path)?,
@@ -196,7 +230,7 @@ fn run(args: &[String]) -> Result<Value, Error> {
     }
     if command == "check-set" {
         let unit =
-            draftwright::inventory::Unit::read(flag(args, "--units")).map_err(Error::invalid)?;
+            draftwright::inventory::Unit::read(units).map_err(Error::invalid)?;
         let dir = std::path::Path::new(arg(1)?);
         let pdf = flag(args, "--drawing")
             .ok_or_else(|| Error::invalid("check-set needs --drawing <set.pdf>"))?;
@@ -271,7 +305,7 @@ fn run(args: &[String]) -> Result<Value, Error> {
     }
     if matches!(command.as_str(), "features" | "check") {
         let unit =
-            draftwright::inventory::Unit::read(flag(args, "--units")).map_err(Error::invalid)?;
+            draftwright::inventory::Unit::read(units).map_err(Error::invalid)?;
         let drawing = if command == "check" {
             let path = flag(args, "--drawing").ok_or_else(|| {
                 Error::invalid("check needs --drawing <drawing.pdf | drawing.txt>")

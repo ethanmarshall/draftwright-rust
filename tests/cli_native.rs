@@ -330,3 +330,25 @@ fn sheet_recognition(name: &str) -> Option<PathBuf> {
     std::fs::write(&path, text).unwrap();
     Some(path)
 }
+
+/// `--standard` chooses ISO or ASME for one run, over the Spec's own `sheet/standard`: the same
+/// part and Spec print millimetres one way and inches the other, and anything else is refused.
+#[test]
+fn standard_flag_chooses_iso_or_asme() {
+    let step = fixture("parts/plate.step");
+    let step = step.to_str().unwrap();
+    let svg = |review: &Value| review["svg"].as_str().unwrap_or_default().to_string();
+    let (code, asme) = run(&["review", step, "--standard", "asme"]);
+    assert_eq!(code, Some(0), "{asme}");
+    let (code, iso) = run(&["review", step, "--standard", "ISO"]);
+    assert_eq!(code, Some(0), "{iso}");
+    assert!(svg(&asme).contains("ASME Y14.5"), "the ASME title block");
+    assert!(!svg(&iso).contains("ASME Y14.5"), "the ISO title block");
+    // The flag wins over the Spec.
+    let spec = scratch("asme_spec.json");
+    std::fs::write(&spec, r#"{"sheet":{"standard":"asme"}}"#).unwrap();
+    let (_, over) = run(&["review", step, "--spec", spec.to_str().unwrap(), "--standard", "iso"]);
+    assert!(!svg(&over).contains("ASME Y14.5"));
+    let (code, bad) = run(&["review", step, "--standard", "din"]);
+    assert_eq!(code, Some(2), "{bad}");
+}

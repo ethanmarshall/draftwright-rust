@@ -72,6 +72,21 @@ a PDF of the set. It gives each part the pages whose title block carries its num
 of several sheets is checked as one. A cover or index page is not counted as anyone's sheet. A part
 no title block carries is checked against the page that mentions it and is reported that way.
 
+## Straight from Onshape
+
+`tools/onshape_export.py` exports every solid part of an Onshape document as its own STEP file,
+named `<part number>_<name>.step`, and can run `check-set` on them:
+
+```
+export ONSHAPE_ACCESS_KEY=...  ONSHAPE_SECRET_KEY=...
+python3 tools/onshape_export.py "<Onshape URL of the document or a Part Studio>" -o parts \
+    --drawing set.pdf --fix punch.md --standard asme
+```
+
+The keys are an Onshape API key pair, read from the environment only. Each part needs its Part
+number set in Onshape so its file matches its drawing; parts without one are listed. Each part
+costs about two Onshape API calls plus the translation's status checks.
+
 ## Other fixes
 
 - Recognition refusals (such as `prismatic_pocket_refusals`) are kept as refusals instead of

@@ -229,11 +229,19 @@ fn run(args: &[String]) -> Result<Value, Error> {
         let Some(object) = spec.as_object_mut() else {
             return Err(Error::invalid("the Spec is not a JSON object"));
         };
-        let sheet = object.entry("sheet").or_insert_with(|| json!({}));
-        let Some(sheet) = sheet.as_object_mut() else {
-            return Err(Error::invalid("the Spec's sheet is not a JSON object"));
-        };
-        sheet.insert("standard".into(), json!(standard));
+        if command == "pack" {
+            // A pack Spec carries the standard for all its drawings.
+            object.insert("standard".into(), json!(standard));
+            object
+                .entry("schema")
+                .or_insert_with(|| json!(draftwright::pack::SPEC_SCHEMA));
+        } else {
+            let sheet = object.entry("sheet").or_insert_with(|| json!({}));
+            let Some(sheet) = sheet.as_object_mut() else {
+                return Err(Error::invalid("the Spec's sheet is not a JSON object"));
+            };
+            sheet.insert("standard".into(), json!(standard));
+        }
     }
     // A check reports in the standard's unit unless --units says otherwise.
     let units = flag(args, "--units").or(match standard {

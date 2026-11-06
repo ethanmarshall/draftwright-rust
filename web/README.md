@@ -5,7 +5,8 @@ Chrome, any) without installing anything:
 
 - **Make drawings**: upload STEP files, choose **ASME (inches)** or **ISO (mm)**, optionally dual
   dimensions, a revision block and distribution statement, the CAGE code and revision; get PDF,
-  SVG and PNG back, one drawing per file.
+  SVG and PNG back, one drawing per file. Or upload one assembly STEP for the whole package:
+  general assembly with parts list and balloons, then a drawing per made part.
 - **Check a drawing set**: upload the parts and the set's PDF (from any CAD program); get the
   `check-set` report and its punch list.
 

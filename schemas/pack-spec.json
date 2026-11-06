@@ -8,6 +8,13 @@
       "const": "draftwright.pack-spec/1",
       "default": "draftwright.pack-spec/1"
     },
+    "standard": {
+      "enum": [
+        "iso",
+        "asme"
+      ],
+      "description": "The standard of every drawing in the pack (each part's and the GA's) whose own Spec does not set sheet/standard."
+    },
     "parts": {
       "type": "object",
       "additionalProperties": {

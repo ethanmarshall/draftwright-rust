@@ -122,7 +122,7 @@ function JobView({ job }) {
       ${others.map(f => html`<a key=${f} href=${`api/jobs/${job.id}/files/${encodeURIComponent(f)}`} target="_blank">${f}</a>`)}
     </div>`}
     ${pngs.length > 0 && html`<div class="thumbs">${pngs.map(f => html`<figure key=${f}>
-      <a href=${`api/jobs/${job.id}/files/${encodeURIComponent(f.replace(/\.png$/, ".pdf"))}`} target="_blank">
+      <a href=${`api/jobs/${job.id}/files/${encodeURIComponent(f.startsWith("page") ? "pack.pdf" : f.replace(/\.png$/, ".pdf"))}`} target="_blank">
         <img src=${`api/jobs/${job.id}/files/${encodeURIComponent(f)}`} alt=${f} /></a>
       <figcaption>${f.replace(/\.png$/, "")}</figcaption></figure>`)}</div>`}
     ${job.punch_list && html`<h3>Punch list</h3><pre class="punch">${job.punch_list}</pre>`}
@@ -134,11 +134,18 @@ function Make() {
   const [steps, setSteps] = useState([]);
   const [dual, setDual] = useState(false);
   const [gov, setGov] = useState(false);
+  const [assembly, setAssembly] = useState(false);
   const [fields, setFields] = useState({ cage: "", revision: "", drawn_by: "", company: "" });
   const { job, error, start } = useJob();
   const busy = job && (job.state === "queued" || job.state === "running");
   const go = () => {
     const form = new FormData();
+    if (assembly) {
+      form.append("step", steps[0]);
+      form.append("standard", standard);
+      start("api/pack", form);
+      return;
+    }
     steps.forEach(f => form.append("steps", f));
     form.append("standard", standard);
     form.append("dual", dual && standard === "asme");
@@ -151,19 +158,21 @@ function Make() {
   return html`<div>
     <div class="card">
       <${Standard} value=${standard} onChange=${setStandard} />
-      <label class="field">STEP files (one drawing each; name them by drawing number, e.g. SRT-100-116_holder.step)</label>
-      <${Drop} label="Drop STEP files here, or click to choose" accept=".step,.stp" multiple=${true} files=${steps} onFiles=${setSteps} />
-      ${standard === "asme" && html`<div>
+      <label class="check"><input type="checkbox" checked=${assembly} onChange=${e => { setAssembly(e.target.checked); setSteps(steps.slice(0, 1)); }} />
+        One assembly STEP: make the whole package (general assembly with parts list and balloons, plus a drawing for each made part)</label>
+      <label class="field">${assembly ? "The assembly STEP file" : "STEP files (one drawing each; name them by drawing number, e.g. SRT-100-116_holder.step)"}</label>
+      <${Drop} label=${assembly ? "Drop the assembly STEP here, or click to choose" : "Drop STEP files here, or click to choose"} accept=".step,.stp" multiple=${!assembly} files=${steps} onFiles=${f => setSteps(assembly ? f.slice(0, 1) : f)} />
+      ${standard === "asme" && !assembly && html`<div>
         <label class="check"><input type="checkbox" checked=${dual} onChange=${e => setDual(e.target.checked)} /> Dual dimensions (.250 [6.35])</label>
         <label class="check"><input type="checkbox" checked=${gov} onChange=${e => setGov(e.target.checked)} /> Revision block and distribution statement</label>
       </div>`}
-      <div class="row">
+      ${!assembly && html`<div class="row">
         ${field("revision", "Revision")}
         ${field("drawn_by", "Drawn by")}
         ${field("company", "Company")}
         ${standard === "asme" ? field("cage", "CAGE code") : null}
-      </div>
-      <button class="primary" disabled=${!steps.length || busy} onClick=${go}>Make ${standard.toUpperCase()} drawings</button>
+      </div>`}
+      <button class="primary" disabled=${!steps.length || busy} onClick=${go}>${assembly ? `Make the ${standard.toUpperCase()} package` : `Make ${standard.toUpperCase()} drawings`}</button>
       ${error && html`<div class="err">${error}</div>`}
     </div>
     <${JobView} job=${job} />

@@ -117,6 +117,7 @@ pub(super) struct Prepared {
 impl Prepared {
     pub fn render(&mut self, total: usize, font: &Font) -> Result<Drawing, Error> {
         let started = std::time::Instant::now();
+        let _standard = crate::standard::scope(&self.plan.spec.clone());
         let sheet = &mut self.plan.sheet;
         sheet.title.insert("sheet".into(), format!("1/{total}"));
         crate::title_block::pack_cells(sheet, 0, 0);
@@ -859,9 +860,15 @@ pub(super) fn prepare<'a>(
             .or_default()
             .style
             .get_or_insert(crate::label_text::Style::Reference);
-        spec.precision
-            .entry(id)
-            .or_insert(if size.fract().abs() < 1e-9 { 0 } else { 1 });
+        // Millimetres to 0.1, whole values as integers; inches (ASME) to two places.
+        let places = if spec.sheet.standard.as_deref() == Some("asme") {
+            2
+        } else if size.fract().abs() < 1e-9 {
+            0
+        } else {
+            1
+        };
+        spec.precision.entry(id).or_insert(places);
     }
     spec.dimensions.retain(|_, d| !d.omit);
     let mut list = vec![vec![

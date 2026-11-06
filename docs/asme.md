@@ -35,6 +35,15 @@ always prints them: `⌀.132 LC2 +.0005 -.0000`. The table runs to 19.69 in and 
 consistency by a unit test in [`src/ansi_fits.rs`](../src/ansi_fits.rs). An ISO sheet refuses
 these classes.
 
+## A whole assembly
+
+`draftwright pack assembly.step -o out --standard asme` makes the drawing package for an
+assembly: a general assembly with its parts list and item balloons, then one drawing for each
+distinct made part (identical parts are merged and counted; screws, nuts, washers, bearings and
+the like are listed as bought and not drawn), as one `pack.pdf` plus `pack.csv` and `pack.json`.
+The pack Spec's `standard` (`"standard": "asme"`, which `--standard` sets) draws every sheet to
+it; a part's own `drawing` Spec can still set its own. See "Drawing packs" in `model.md`.
+
 ## Government drawing fields
 
 For a drawing package that goes to a government customer, an ASME sheet carries:

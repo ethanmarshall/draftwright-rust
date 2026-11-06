@@ -1122,3 +1122,34 @@ fn ga_item_hatch_override_survives_conventional_thread_rendering() {
         "the item's authored hatch angle must survive the thread carrier's section cache key"
     );
 }
+
+/// A pack Spec's `standard` draws every sheet to it: the GA and each part's drawing print
+/// inches with the ASME title block, the GA's envelope sizes to two places. An unknown standard
+/// is refused.
+#[test]
+fn a_pack_standard_reaches_every_drawing() {
+    let spec: PackSpec = serde_json::from_value(json!({
+        "schema": pack::SPEC_SCHEMA, "standard": "asme"
+    }))
+    .unwrap();
+    let (report, files) = pack::render(&fixture("assembly.step"), &spec, &["pdf"]).unwrap();
+    assert!(report.rows.iter().all(|r| r.error.is_none()));
+    let pdf = &files.iter().find(|(name, _)| name.ends_with("pdf")).unwrap().1;
+    let path = std::env::temp_dir().join(format!("dw_pack_asme_{}.pdf", std::process::id()));
+    std::fs::write(&path, pdf).unwrap();
+    let text = String::from_utf8(
+        std::process::Command::new("pdftotext")
+            .args(["-layout", path.to_str().unwrap(), "-"])
+            .output()
+            .expect("pdftotext")
+            .stdout,
+    )
+    .unwrap();
+    let pages: Vec<&str> = text.split('\u{c}').filter(|p| !p.trim().is_empty()).collect();
+    assert!(pages.len() >= 2);
+    assert!(pages.iter().all(|p| p.contains("ASME Y14.5")), "every sheet ASME");
+    assert!(pages[0].contains("(3.94)"), "the GA's envelope in inches: {}", pages[0]);
+    let bad: PackSpec =
+        serde_json::from_value(json!({ "schema": pack::SPEC_SCHEMA, "standard": "din" })).unwrap();
+    assert!(pack::build(&fixture("assembly.step"), &bad).is_err());
+}

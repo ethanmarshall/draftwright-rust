@@ -58,6 +58,10 @@ pub struct PartSpec {
 #[serde(default, deny_unknown_fields)]
 pub struct PackSpec {
     pub schema: String,
+    /// `iso` or `asme`: the standard of every drawing in the pack (each part's and the GA's)
+    /// whose own Spec does not set `sheet/standard`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub standard: Option<String>,
     pub parts: BTreeMap<String, PartSpec>,
     pub ga: GaSpec,
 }
@@ -66,6 +70,7 @@ impl Default for PackSpec {
     fn default() -> Self {
         Self {
             schema: SPEC_SCHEMA.into(),
+            standard: None,
             parts: BTreeMap::new(),
             ga: GaSpec::default(),
         }
@@ -408,6 +413,22 @@ pub fn build(step: &Path, spec: &PackSpec) -> Result<Pack, Error> {
             "pack Spec schema must be {SPEC_SCHEMA}"
         )));
     }
+    // The pack's standard reaches the GA's drawing here, and each part's where its Spec is made.
+    let standardised;
+    let spec = match spec.standard.as_deref() {
+        None => spec,
+        Some("iso" | "asme") => {
+            let mut s = spec.clone();
+            s.ga.drawing.sheet.standard.get_or_insert_with(|| spec.standard.clone().unwrap());
+            standardised = s;
+            &standardised
+        }
+        Some(other) => {
+            return Err(Error::invalid(format!(
+                "pack Spec standard {other:?} is not a drawing standard; give iso or asme"
+            )));
+        }
+    };
     let mut timings = Timings::default();
     let started = Instant::now();
     let bytes = model::read_step_file(step).map_err(Error::invalid)?;
@@ -765,7 +786,10 @@ pub fn build(step: &Path, spec: &PackSpec) -> Result<Pack, Error> {
                 row.key
             )));
         }
-        let mut drawing_spec = values.first().map(|v| (*v).clone()).unwrap_or_default();
+        let mut drawing_spec: Spec = values.first().map(|v| (*v).clone()).unwrap_or_default();
+        if drawing_spec.sheet.standard.is_none() {
+            drawing_spec.sheet.standard = spec.standard.clone();
+        }
         for (field, target) in [
             ("material", &mut row.bom.material),
             ("number", &mut row.bom.part_number),
@@ -1101,6 +1125,8 @@ pub fn build(step: &Path, spec: &PackSpec) -> Result<Pack, Error> {
                 continue;
             };
             let started = Instant::now();
+            // The title cells are filled again here, so in the drawing's standard.
+            let _standard = crate::standard::scope(&p.plan.spec.clone());
             for (i, sheet) in std::iter::once(&mut p.plan.sheet)
                 .chain(p.plan.sheets.iter_mut())
                 .enumerate()

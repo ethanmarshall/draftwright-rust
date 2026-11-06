@@ -191,6 +191,47 @@ def render_job(jid: str, folder: Path, steps: list[Path], spec: dict, formats: s
            summary=f"{done} of {len(steps)} drawings made ({spec['sheet']['standard'].upper()})")
 
 
+def pack_job(jid: str, folder: Path, step: Path, standard: str):
+    """An assembly: the general assembly, one drawing per distinct made part, and the parts list."""
+    update(jid, state="running")
+    step_status(jid, step.name, "running", "about 45 s per distinct part")
+    out = folder / "out"
+    try:
+        r = run([BIN, "pack", str(step), "-o", str(out), "--standard", standard,
+                 "--formats", "pdf,csv,json"], timeout=max(TIMEOUT, 3600))
+        result = json.loads(r.stdout or "{}")
+    except subprocess.TimeoutExpired:
+        step_status(jid, step.name, "failed", "took longer than an hour")
+        update(jid, state="failed", error="the package took too long")
+        return
+    except json.JSONDecodeError:
+        step_status(jid, step.name, "failed", r.stderr[-300:])
+        update(jid, state="failed", error="the package failed")
+        return
+    if result.get("ok") is False:
+        message = result["error"]["message"]
+        step_status(jid, step.name, "failed", message)
+        update(jid, state="failed", error=message)
+        return
+    rows = result["report"]["rows"]
+    made = [r for r in rows if r.get("supply") != "buy"]
+    failed = [r for r in made if r.get("error")]
+    for r in rows:
+        state = "failed" if r.get("error") else "done"
+        detail = "bought, listed only" if r.get("supply") == "buy" else (
+            r["error"]["message"] if isinstance(r.get("error"), dict) else r.get("error"))
+        step_status(jid, f"item {r['item']}: {r['name']} x{r['qty']}", state, detail)
+    step_status(jid, step.name, "done")
+    pdf = out / "pack.pdf"
+    if pdf.exists():
+        subprocess.run(["pdftoppm", "-png", "-r", "45", str(pdf), str(out / "page")],
+                       capture_output=True, timeout=600)
+    update(jid, state="done", files=sorted(p.name for p in out.iterdir()),
+           summary=(f"{len(made) - len(failed)} part drawings, {len(rows) - len(made)} bought items"
+                    f"{', general assembly' if result['report'].get('general_assembly') else ''}"
+                    f"{f'; {len(failed)} failed' if failed else ''} ({standard.upper()})"))
+
+
 def check_job(jid: str, folder: Path, drawing: Path, standard: str):
     update(jid, state="running")
     step_status(jid, "check-set", "running")
@@ -255,6 +296,17 @@ async def render(
     for s in saved:
         step_status(jid, s.name, "queued")
     worker.submit(guarded, render_job, jid, folder, saved, spec, formats)
+    return {"id": jid}
+
+
+@app.post("/api/pack")
+async def pack(step: UploadFile = File(...), standard: str = Form("asme")):
+    if standard not in ("iso", "asme"):
+        raise HTTPException(400, "standard is iso or asme")
+    jid, folder = new_job("pack")
+    [saved] = await save_uploads([step], folder / "in", (".step", ".stp"))
+    step_status(jid, saved.name, "queued")
+    worker.submit(guarded, pack_job, jid, folder, saved, standard)
     return {"id": jid}
 
 
